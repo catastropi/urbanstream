@@ -1,0 +1,21 @@
+# Kafka 토픽 정의. 이름·파티션·보관 기간을 한곳에서 관리한다 (결정 근거: docs/adr/0004-collector-topics.md).
+# Blueprint H절 원문이 없어서 이름은 이 저장소에서 정한 제안이다. 이름을 바꿀 때는 이 파일과 sources.yaml 만 고치면 된다.
+#
+# 메시지: key = 소스별 파티션 키(코드: collector/runner.py 의 KEY_FUNCS), value = envelope+payload JSON(UTF-8),
+#         Kafka 메시지 timestamp = event_time (event-time 중심 원칙).
+# 파티션 수는 임시값이다. 단일 브로커 개발 환경이라 복제 수는 1.
+defaults:
+  replication_factor: 1
+  retention_ms: 259200000        # 72시간. 원본은 data/raw 에 따로 보관되므로 Kafka 는 재처리 완충 용도
+
+topics:
+  urban.traffic.speed.v1:        {partitions: 3}   # key = link_id
+  urban.traffic.incident.v1:     {partitions: 1}   # key = acc_id
+  urban.bus.position.v1:         {partitions: 3}   # key = veh_id
+  urban.bus.arrival.v1:          {partitions: 3}   # key = route_id|station_id
+  urban.weather.observation.v1:  {partitions: 1}   # key = nx|ny
+  urban.dlq.v1:                  {partitions: 1, retention_ms: 604800000}   # 계약 위반 행, 해석 불가 응답 (7일)
+  platform.audit:                {partitions: 1, retention_ms: 604800000}   # 호출 1회(시도)마다 결과 기록 — 문제 F 입력 (7일)
+
+dlq_topic: urban.dlq.v1
+audit_topic: platform.audit

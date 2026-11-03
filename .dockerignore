@@ -1,0 +1,14 @@
+# 이미지에 넣지 않는 것. 특히 .env(실제 키)와 data/(수집 원본)는 절대 들어가면 안 된다.
+.env
+.env.*
+!.env.example
+data/
+.git/
+.github/
+.idea/
+.pytest_cache/
+**/__pycache__/
+*.pyc
+.DS_Store
+docs/
+tests/

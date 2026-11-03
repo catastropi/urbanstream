@@ -1,0 +1,14 @@
+{
+  "_comment": "recorded 샘플의 호출 맥락. fetched_at 은 파일명 시각(KST). http_status 는 응답 본문과 관측 기록으로 정한 값이다.",
+  "files": {
+    "seoul_traffic/ok_20261101T180753.xml":              {"source": "seoul_traffic",  "fetched_at": "2026-11-01T18:07:53+09:00", "http_status": 200, "expect_kind": "ok"},
+    "seoul_traffic/err_info100_20261028T150949.xml":     {"source": "seoul_traffic",  "fetched_at": "2026-10-28T15:09:49+09:00", "http_status": 200, "expect_kind": "auth"},
+    "seoul_traffic/err_error301_20261028T151706.xml":    {"source": "seoul_traffic",  "fetched_at": "2026-10-28T15:17:06+09:00", "http_status": 200, "expect_kind": "param"},
+    "seoul_incident/ok_20261101T180755.xml":             {"source": "seoul_incident", "fetched_at": "2026-11-01T18:07:55+09:00", "http_status": 200, "expect_kind": "ok"},
+    "bus_position/ok_20261101T215320.xml":               {"source": "bus_position",   "fetched_at": "2026-11-01T21:53:20+09:00", "http_status": 200, "expect_kind": "ok", "kwargs": {"route_id": "100100118"}},
+    "bus_arrival/ok_20261101T215321.xml":                {"source": "bus_arrival",    "fetched_at": "2026-11-01T21:53:21+09:00", "http_status": 200, "expect_kind": "ok"},
+    "kma_ncst/ok_20261028T150951.json":                  {"source": "kma_ncst",       "fetched_at": "2026-10-28T15:09:51+09:00", "http_status": 200, "expect_kind": "ok"},
+    "gateway/err_no_service_12_20261013T190221.json":    {"source": "bus_position",   "fetched_at": "2026-10-13T19:02:21+09:00", "http_status": 200, "expect_kind": "no_service"},
+    "gateway/err_401_20261101T180914.json":              {"source": "bus_position",   "fetched_at": "2026-11-01T18:09:14+09:00", "http_status": 401, "expect_kind": "auth"}
+  }
+}

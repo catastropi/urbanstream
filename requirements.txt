@@ -1,0 +1,6 @@
+# UrbanStream 실행 의존성. (Step 0 스모크 테스트: requests, python-dotenv / Step 3 Collector: pyyaml, confluent-kafka)
+# 이후 단계(Spark, Airflow, FastAPI 등)에서 계속 추가될 예정.
+requests>=2.31.0
+python-dotenv>=1.0.0
+pyyaml>=6.0
+confluent-kafka>=2.6

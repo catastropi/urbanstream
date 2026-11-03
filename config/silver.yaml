@@ -1,0 +1,32 @@
+# Silver 설정 (ADR-0007). 값을 바꾸면 Silver 를 새 체크포인트로 다시 만든다 (Bronze 에서 재생성 가능).
+# 근거 숫자는 docs/adr/0007-silver-rules.md, 재확인 시점은 docs/DEFERRED.md D-01.
+trigger_sec: 60
+max_files_per_trigger: 1000      # Bronze 파일 수 기준. 멈췄다 켜진 뒤 밀린 양을 나눠 읽는다 (하루 약 8,300개)
+long_term_days: 7                # 돌발: 계획 기간이 이 일수를 넘으면 is_long_term (제외하지 않고 표시만, ADR-0007 2-3)
+
+tables:
+  seoul_traffic:
+    name: silver_traffic_speed
+    watermark_col: event_time
+    watermark: "10 minutes"
+    dedup_keys: [dedup_key]
+  seoul_incident:                # 관측 로그: 같은 돌발이 호출마다 다시 나오는 것이 정상이다 → 호출 안의 재전송만 제거
+    name: silver_incident_observation
+    watermark_col: fetched_at
+    watermark: "10 minutes"
+    dedup_keys: [dedup_key, ingest_id]
+  bus_position:
+    name: silver_bus_position
+    watermark_col: event_time
+    watermark: "10 minutes"
+    dedup_keys: [dedup_key]
+  bus_arrival:
+    name: silver_bus_arrival
+    watermark_col: event_time
+    watermark: "10 minutes"
+    dedup_keys: [dedup_key]
+  kma_ncst:
+    name: silver_weather
+    watermark_col: event_time
+    watermark: "3 hours"
+    dedup_keys: [dedup_key]

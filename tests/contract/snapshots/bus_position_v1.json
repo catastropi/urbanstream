@@ -1,0 +1,178 @@
+{
+  "source_system": "bus_position",
+  "schema_version": "bus_position_v1",
+  "envelope": [
+    {
+      "name": "event_id",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "source_system",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "schema_version",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "event_time",
+      "type": "timestamp",
+      "nullable": false
+    },
+    {
+      "name": "fetched_at",
+      "type": "timestamp",
+      "nullable": false
+    },
+    {
+      "name": "ingested_at",
+      "type": "timestamp",
+      "nullable": true
+    },
+    {
+      "name": "ingest_id",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "raw_uri",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "dedup_key",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "http_status",
+      "type": "long",
+      "nullable": false
+    },
+    {
+      "name": "latency_ms",
+      "type": "long",
+      "nullable": true
+    }
+  ],
+  "payload": [
+    {
+      "name": "route_id",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "veh_id",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "plain_no",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "lon",
+      "type": "double",
+      "nullable": true
+    },
+    {
+      "name": "lat",
+      "type": "double",
+      "nullable": true
+    },
+    {
+      "name": "tm_x",
+      "type": "double",
+      "nullable": true
+    },
+    {
+      "name": "tm_y",
+      "type": "double",
+      "nullable": true
+    },
+    {
+      "name": "section_id",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "sect_ord",
+      "type": "long",
+      "nullable": true
+    },
+    {
+      "name": "last_stop_id",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "next_stop_id",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "turn_stop_id",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "last_st_tm",
+      "type": "long",
+      "nullable": true
+    },
+    {
+      "name": "next_st_tm",
+      "type": "long",
+      "nullable": true
+    },
+    {
+      "name": "sect_dist",
+      "type": "double",
+      "nullable": true
+    },
+    {
+      "name": "full_sect_dist",
+      "type": "double",
+      "nullable": true
+    },
+    {
+      "name": "rt_dist",
+      "type": "double",
+      "nullable": true
+    },
+    {
+      "name": "bus_type",
+      "type": "long",
+      "nullable": true
+    },
+    {
+      "name": "congestion",
+      "type": "long",
+      "nullable": true
+    },
+    {
+      "name": "stop_flag",
+      "type": "long",
+      "nullable": true
+    },
+    {
+      "name": "is_running",
+      "type": "boolean",
+      "nullable": true
+    },
+    {
+      "name": "is_last",
+      "type": "boolean",
+      "nullable": true
+    },
+    {
+      "name": "is_full",
+      "type": "boolean",
+      "nullable": true
+    }
+  ]
+}

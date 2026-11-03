@@ -1,0 +1,71 @@
+# Collector 수집 설정. 결정 근거: docs/adr/0004-collector-topics.md, 소스별 관측: docs/api-catalog/
+#
+# ★ 호출 한도(daily_budget): 버스위치·버스도착은 2026-11-03 사용자가 공공데이터포털 화면에서 확인했다 (상세기능별 일일 트래픽 1,000건). 기상청 10,000건은 공식.
+#   서울 도로소통·돌발(열린데이터광장)은 화면에서 확인하지 못했다 (이용약관 제6조에 숫자 없음) → 보수적으로 1,000건을 상한으로 두고 basis=unknown.
+#   (서울 쪽이 인증키 합산 1,000건이면 두 소스의 계획 합 1,440회가 한도를 넘는다 — 확인되면 간격을 늘린다)
+#   갱신 주기(interval_sec)와 kma 지연(kma_available_after_min)은 측정 결과로 정했다 (근거: 아래 주석, docs/api-catalog/, ADR-0004 결정 7).
+#   80% 규칙 때문에 소스당 하루 계획은 최대 800회 → 20시간 활성이면 최소 간격 90초, 24시간이면 108초.
+#   - budget_basis: official = 공식 확인, assumed = 코드·문서가 전제한 값, unknown = 한도 미확인이라 잡은 임시 상한
+# ★ 안전장치: 로딩할 때 (대상 수 × 활성 시간 ÷ interval) 이 daily_budget 의 80% 를 넘으면 시작을 거부한다.
+#   (나머지 20% 는 재시도 여유. 재시도도 호출 예산을 쓴다.)
+# 값 안의 ${NAME:-기본값} 은 .env / 환경변수로 치환된다. 키(SEOUL_API_KEY 등)는 여기에 쓰지 않는다.
+version: 1
+
+defaults:
+  # connect/read 는 '바이트 사이 간격'만 막는다 (2026-11-02 버스도착 26.2초 호출 관측). total 은 호출 1회의 총 제한시간.
+  # 관측한 정상 지연: 도로·버스 p95 0.3~2.7초, 돌발 p95 1.6초. 되돌리려면 read 20, total 을 크게(예: 60).
+  timeout_sec: {connect: 5, read: 10, total: 15}
+  retry: {max_attempts: 3, base_delay_sec: 1.0, max_delay_sec: 10.0}
+  # 연속 실패 failure_threshold 번이면 호출을 멈추고 cooldown 뒤에 1번만 시험 호출.
+  # 인증/인자 오류처럼 다시 해도 소용없는 실패는 즉시 멈추고 permanent_cooldown 동안 쉰다.
+  breaker: {failure_threshold: 5, cooldown_sec: 300, permanent_cooldown_sec: 900}
+  # 기상청 초단기실황은 정시 발표 후 제공까지 시간이 걸린다. 2026-11-03 16시 발표분 측정(kma-lag): 정시+0~5분 NO_DATA(code 03), 정시+6.0분에 처음 조회됨.
+  # 6분의 약 2.5배인 15분으로 둔다 — 1회 측정이라 시간대별 변동을 모르고, 너무 일찍 부르면 NO_DATA(03)를 파서가 'unknown'으로 받아 재시도 3회+DLQ+회로차단 실패로 처리한다.
+  # 이전 값 45는 개발자 글의 관례("40분 이후")였다. 되돌리거나 줄이려면 이 값만 바꾼다 (줄이기 전에 NO_DATA 처리 개선 권장).
+  kma_available_after_min: 15
+
+sources:
+  seoul_traffic:
+    enabled: true
+    topic: urban.traffic.speed.v1
+    interval_sec: 120        # 2026-11-02 cadence 1회 측정: 변경 간격 120/179/121/179/120/180/120초 (평균 146초, 약 150초 주기로 추정). 퇴근 시간대 재측정으로 확정
+    daily_budget: 1000       # 이전 임시값 2000 → 보수적으로 1000 (화면 미확인, 계획 720회 = 72%)
+    budget_basis: unknown
+    active_window: ["00:00", "24:00"]
+    link_ids: ["${SEOUL_TRAFFIC_LINK_ID:-1220003800}"]   # 링크 목록은 지오메트리 확보 후 늘린다
+
+  seoul_incident:
+    enabled: true
+    topic: urban.traffic.incident.v1
+    interval_sec: 120        # 변화는 사건 발생·해제 때문이라 소스 주기를 모른다. 1000건 한도에서 120초가 가장 촘촘한 값에 가깝다 (108초 이상)
+    daily_budget: 1000       # 화면 미확인 — 보수적 상한
+    budget_basis: unknown
+    active_window: ["00:00", "24:00"]
+    page_size: 200          # 현재 10건. 응답의 전체 건수가 page_size 를 넘으면 audit 에 truncated 로 표시
+
+  bus_position:
+    enabled: true
+    topic: urban.bus.position.v1
+    interval_sec: 90
+    daily_budget: 1000
+    budget_basis: official   # 상세기능별 일일 트래픽 1,000건 (공공데이터포털 화면, 사용자 확인 2026-11-03). 차량 보고 주기는 약 20초지만 한도 때문에 90초가 최소 (80% 규칙)
+    active_window: ["04:00", "24:00"]   # 첫차 04시대, 심야에는 운행 차량이 거의 없다
+    route_ids: ["${SEOUL_BUS_ROUTE_ID:-100100118}"]     # 753번
+
+  bus_arrival:
+    enabled: true
+    topic: urban.bus.arrival.v1
+    interval_sec: 90         # 서버가 약 20초마다 스냅샷을 만들지만 한도 때문에 90초가 최소 (갱신의 약 1/4~1/5만 봄)
+    daily_budget: 1000
+    budget_basis: official
+    active_window: ["04:00", "24:00"]
+    route_ids: ["${SEOUL_BUS_ROUTE_ID:-100100118}"]
+
+  kma_ncst:
+    enabled: true
+    topic: urban.weather.observation.v1
+    interval_sec: 600        # 같은 발표 시각을 이미 받았으면 호출을 건너뛴다 (실제 호출은 시간당 1~2회)
+    daily_budget: 10000
+    budget_basis: official
+    active_window: ["00:00", "24:00"]
+    grids: [{nx: "${KMA_NX:-60}", ny: "${KMA_NY:-127}"}]

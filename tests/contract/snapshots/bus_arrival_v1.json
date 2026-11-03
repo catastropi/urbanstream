@@ -1,0 +1,173 @@
+{
+  "source_system": "bus_arrival",
+  "schema_version": "bus_arrival_v1",
+  "envelope": [
+    {
+      "name": "event_id",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "source_system",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "schema_version",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "event_time",
+      "type": "timestamp",
+      "nullable": false
+    },
+    {
+      "name": "fetched_at",
+      "type": "timestamp",
+      "nullable": false
+    },
+    {
+      "name": "ingested_at",
+      "type": "timestamp",
+      "nullable": true
+    },
+    {
+      "name": "ingest_id",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "raw_uri",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "dedup_key",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "http_status",
+      "type": "long",
+      "nullable": false
+    },
+    {
+      "name": "latency_ms",
+      "type": "long",
+      "nullable": true
+    }
+  ],
+  "payload": [
+    {
+      "name": "route_id",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "route_name",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "station_id",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "station_ars_id",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "station_name",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "station_order",
+      "type": "long",
+      "nullable": false
+    },
+    {
+      "name": "slot",
+      "type": "long",
+      "nullable": false
+    },
+    {
+      "name": "veh_id",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "plain_no",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "arrival_msg",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "stops_away",
+      "type": "long",
+      "nullable": true
+    },
+    {
+      "name": "arrive_in_sec",
+      "type": "long",
+      "nullable": true
+    },
+    {
+      "name": "pred_exps_sec",
+      "type": "long",
+      "nullable": true
+    },
+    {
+      "name": "pred_kals_sec",
+      "type": "long",
+      "nullable": true
+    },
+    {
+      "name": "pred_neus_sec",
+      "type": "long",
+      "nullable": true
+    },
+    {
+      "name": "speed",
+      "type": "long",
+      "nullable": true
+    },
+    {
+      "name": "arrive_code",
+      "type": "long",
+      "nullable": true
+    },
+    {
+      "name": "is_last_bus",
+      "type": "boolean",
+      "nullable": true
+    },
+    {
+      "name": "bus_type",
+      "type": "long",
+      "nullable": true
+    },
+    {
+      "name": "bus_station_name",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "first_bus_time",
+      "type": "timestamp",
+      "nullable": true
+    },
+    {
+      "name": "last_bus_time",
+      "type": "timestamp",
+      "nullable": true
+    }
+  ]
+}

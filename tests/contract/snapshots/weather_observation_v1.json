@@ -1,0 +1,98 @@
+{
+  "source_system": "kma_ncst",
+  "schema_version": "weather_observation_v1",
+  "envelope": [
+    {
+      "name": "event_id",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "source_system",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "schema_version",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "event_time",
+      "type": "timestamp",
+      "nullable": false
+    },
+    {
+      "name": "fetched_at",
+      "type": "timestamp",
+      "nullable": false
+    },
+    {
+      "name": "ingested_at",
+      "type": "timestamp",
+      "nullable": true
+    },
+    {
+      "name": "ingest_id",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "raw_uri",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "dedup_key",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "http_status",
+      "type": "long",
+      "nullable": false
+    },
+    {
+      "name": "latency_ms",
+      "type": "long",
+      "nullable": true
+    }
+  ],
+  "payload": [
+    {
+      "name": "nx",
+      "type": "long",
+      "nullable": false
+    },
+    {
+      "name": "ny",
+      "type": "long",
+      "nullable": false
+    },
+    {
+      "name": "category",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "value_raw",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "value",
+      "type": "double",
+      "nullable": true
+    },
+    {
+      "name": "category_name",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "unit",
+      "type": "string",
+      "nullable": true
+    }
+  ]
+}
