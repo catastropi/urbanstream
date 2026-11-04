@@ -73,8 +73,12 @@ def parse(body: Body, ctx: CallContext) -> ParseResult:
 
     code = clean_str(header.get("resultCode"))
     message = clean_str(header.get("resultMsg"))
+    if code == "03":
+        # 2026-11-03 kma-lag 측정: 발표 시각 직후 0~5분은 HTTP 200 + resultCode 03(NO_DATA). 오류가 아니라 '아직 발표 전'이다.
+        # empty 로 두면 재시도·DLQ·회로차단 실패 없이 끝나고, 러너는 kind=="ok" 일 때만 발표 시각을 '받음'으로 기록하므로 다음 주기에 다시 부른다.
+        return ParseResult(SOURCE_SYSTEM, SCHEMA_VERSION, ApiStatus("empty", code, message))
     if code != "00":
-        # 00 이외의 코드는 아직 관측하지 못했다 → unknown 으로 두고 그대로 기록
+        # 그 밖의 코드는 아직 관측하지 못했다 → unknown 으로 두고 그대로 기록
         return ParseResult(SOURCE_SYSTEM, SCHEMA_VERSION, ApiStatus("unknown", code, message))
 
     resp_body = response.get("body") or {}

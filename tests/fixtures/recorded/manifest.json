@@ -9,6 +9,8 @@
     "bus_arrival/ok_20261101T215321.xml":                {"source": "bus_arrival",    "fetched_at": "2026-11-01T21:53:21+09:00", "http_status": 200, "expect_kind": "ok"},
     "kma_ncst/ok_20261028T150951.json":                  {"source": "kma_ncst",       "fetched_at": "2026-10-28T15:09:51+09:00", "http_status": 200, "expect_kind": "ok"},
     "gateway/err_no_service_12_20261013T190221.json":    {"source": "bus_position",   "fetched_at": "2026-10-13T19:02:21+09:00", "http_status": 200, "expect_kind": "no_service"},
-    "gateway/err_401_20261101T180914.json":              {"source": "bus_position",   "fetched_at": "2026-11-01T18:09:14+09:00", "http_status": 401, "expect_kind": "auth"}
+    "gateway/err_401_20261101T180914.json":              {"source": "bus_position",   "fetched_at": "2026-11-01T18:09:14+09:00", "http_status": 401, "expect_kind": "auth"},
+    "bus_position/empty_code4_20261104T024101.xml":      {"source": "bus_position",   "fetched_at": "2026-11-04T02:41:01+09:00", "http_status": 200, "expect_kind": "empty", "kwargs": {"route_id": "100100118"}, "reconstructed": "관측: 226B, headerCd=4 '결과가 없습니다.' — 원본은 사용자 Mac. 같은 크기가 되는 모양으로 재구성"},
+    "kma_ncst/nodata_03_20261103T160200.json":           {"source": "kma_ncst",       "fetched_at": "2026-11-03T16:02:00+09:00", "http_status": 200, "expect_kind": "empty", "reconstructed": "관측: HTTP 200, resultCode 03, NO_DATA (kma-lag 2026-11-03). 본문 모양은 재구성"}
   }
 }

@@ -41,6 +41,7 @@ RUN chmod 0755 /usr/local/bin/urbanstream-pytest
 WORKDIR /app
 COPY src /app/src
 COPY streaming /app/streaming
+COPY batch /app/batch
 COPY config /app/config
 COPY pytest.ini /app/pytest.ini
 ENV PYTHONPATH=/app/src:/app \

@@ -28,11 +28,17 @@ sources:
   seoul_traffic:
     enabled: true
     topic: urban.traffic.speed.v1
-    interval_sec: 120        # 2026-11-02 cadence 1회 측정: 변경 간격 120/179/121/179/120/180/120초 (평균 146초, 약 150초 주기로 추정). 퇴근 시간대 재측정으로 확정
-    daily_budget: 1000       # 이전 임시값 2000 → 보수적으로 1000 (화면 미확인, 계획 720회 = 72%)
+    # 2026-11-04 (ADR-0008 결정 1): 링크 1개/120초 → 링크 4개/450초. 호출은 링크마다 1회라서(`TrafficInfo/1/5/{link_id}`, link_id 없이 부르면
+    #   ERROR-301 — 2026-11-04 확인) 링크가 늘면 같은 한도 안에서 간격이 늘어난다: 4 × 86400/450 = 768회/일 (한도 1,000의 76.8%, 80% 규칙 통과).
+    #   소스 갱신 주기는 약 150초(2026-11-02 cadence 1회: 120/179/121/179/120/180/120초)라서 450초는 갱신의 약 1/3만 본다 → 시간 단위 기준선용.
+    #   되돌리기: link_ids 를 첫 항목만 남기고 interval_sec 를 120 으로.
+    interval_sec: 450
+    daily_budget: 1000       # 화면 미확인(2026-11-04 재확인: "화면에 없음", D-51) — 보수적 상한
     budget_basis: unknown
     active_window: ["00:00", "24:00"]
-    link_ids: ["${SEOUL_TRAFFIC_LINK_ID:-1220003800}"]   # 링크 목록은 지오메트리 확보 후 늘린다
+    # 첫 항목은 기존 링크(.env 의 SEOUL_TRAFFIC_LINK_ID 로 바꿀 수 있다). 나머지 3개는 노선 753 위의 링크(LINK_VERTEX 2025 와 버스 위치 13대를
+    # 맞춰 고름 — 길이 1.1~1.8km, 북쪽/중간/남쪽). 며칠 쌓인 버스 위치로 순위를 뽑아 교체할 수 있다 (docs/runbooks/step6-gold.md).
+    link_ids: ["${SEOUL_TRAFFIC_LINK_ID:-1220003800}", "1110014200", "1120005200", "1190000700"]
 
   seoul_incident:
     enabled: true

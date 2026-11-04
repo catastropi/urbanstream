@@ -14,7 +14,7 @@ CORE = ("postgres", "kafka")
 
 
 def test_expected_services_and_profiles():
-    assert set(SERVICES) == {"postgres", "kafka", "kafka-ui", "spark-bronze", "spark-silver"}
+    assert set(SERVICES) == {"postgres", "kafka", "kafka-ui", "spark-bronze", "spark-silver", "spark-gold"}
     assert SERVICES["postgres"]["profiles"] == ["core"] and SERVICES["kafka"]["profiles"] == ["core"]
     assert SERVICES["kafka-ui"]["profiles"] == ["dev"]
     assert SERVICES["spark-bronze"]["profiles"] == ["streaming"]    # core 만 켜면 Spark 는 뜨지 않는다 (메모리)
@@ -176,3 +176,31 @@ def test_silver_ui_port_differs_from_bronze_and_memory_limit_covers_heap():
     cmd = SILVER["command"]
     assert _mem_mib(_default(SILVER["mem_limit"])) >= _mem_mib(cmd[cmd.index("--driver-memory") + 1]) * 1.4
     assert cmd[-1] == "/app/streaming/silver_writer.py"
+
+
+# ---------------------------------------------------------------- Step 6: spark-gold
+
+GOLD = SERVICES["spark-gold"]
+
+
+def test_gold_is_a_oneshot_profile_service_reusing_the_image_without_secrets_or_ports():
+    assert GOLD["profiles"] == ["gold"] and GOLD["image"] == SPARK["image"] and "build" not in GOLD
+    assert "ports" not in GOLD
+    env_text = str(GOLD.get("environment", {})).upper()
+    assert not any(w in env_text for w in ("KEY", "PASSWORD", "SECRET", "TOKEN")) and "env_file" not in GOLD
+    assert "depends_on" not in GOLD, "DB·Kafka 에 의존하지 않는다 (Parquet 만 읽고 쓴다)"
+
+
+def test_gold_mounts_silver_and_bronze_read_only_and_writes_only_gold_stage():
+    vols = {v.split(":")[0]: v for v in GOLD["volumes"]}
+    assert sorted(vols) == ["./data/bronze", "./data/gold_stage", "./data/silver"]
+    assert vols["./data/bronze"].endswith(":ro") and vols["./data/silver"].endswith(":ro")
+    assert not vols["./data/gold_stage"].endswith(":ro")
+    cmd = GOLD["command"]
+    assert cmd[-1] == "/app/batch/gold_stage.py"
+    assert _mem_mib(_default(GOLD["mem_limit"])) >= _mem_mib(cmd[cmd.index("--driver-memory") + 1]) * 1.4
+
+
+def test_dockerfile_copies_batch_code_only_not_sql_scripts_or_db_loader_secrets():
+    copies = re.findall(r"^COPY (.+)$", DOCKERFILE, re.M)
+    assert "batch /app/batch" in copies and not any(c.startswith(("sql", "scripts", ".env")) for c in copies)

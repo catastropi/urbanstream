@@ -2,7 +2,7 @@
 
 "아직 안 한 것 / 확인 못 한 것 / 일부러 미룬 것"을 **어디에 추가할지**와 함께 적는 단 하나의 목록이다.
 새 채팅은 HANDOFF.md 와 함께 이 파일을 읽는다. 항목을 끝내면 상태를 바꾸고 날짜를 적는다 (지우지 않는다 — 이력이 곧 근거다).
-마지막 갱신: 2026-11-04 01시대 (Silver 구현·Mac silver_verify 통과, D-45·D-46 확인 1회 대기).
+마지막 갱신: 2026-11-04 (Step 6 Gold 구현 — 샌드박스 PostgreSQL 16 에서만 검증, Mac PG17 실행 대기).
 
 **상태:** ⏳ 미착수(할 일) · ❓ 확인 못 함(사실 여부 모름) · ⏸ 일부러 보류(이유와 재검토 시점 있음) · 👤 사용자 작업 · ✅ 완료(날짜)
 **출처:** H9 = HANDOFF 9장, A6 = ADR-0006, 11-03 = 이번 대화에서 발견
@@ -51,7 +51,7 @@
 | D-37 | 수집기 정지 원인 | ✅ 2026-11-04 | 덮개 닫힘 잠자기(D-09). 반복되므로 Step 8 알림 대상이자 상시 가동 방법 필요(D-44) | D-09 |
 | D-38 | 돌발 "해제 시각 = 목록에서 사라진 첫 관측"인지, 같은 `acc_id` 내용 해시가 하루 동안 바뀌는 빈도 | ❓ | Silver 돌발 관측 로그가 하루 이상 쌓인 뒤 `exp_clr_*` 와 비교 | `docs/api-catalog/seoul_incident.md`, Gold(Step 6) |
 | D-39 | 도로소통 `link_id` ↔ 돌발 `link_id` 조인 가능 여부 | ❓ | **도로소통은 링크 1개만 수집** 중이라 지금은 맞을 수가 없다. 링크 목록 확보 후 검증 | `docs/api-catalog/`, Step 6 `dim_link` |
-| D-40 | 링크 지오메트리 + 수집 링크 목록 | ⏳ (H9) | 후보 "소통 돌발 도로별 링크 정보" 데이터셋. 방법은 `docs/runbooks/step0-closeout.md` 4장 | `config/sources.yaml`(링크 목록), `sql/`(`dim_link`) — Step 6 전 필수 |
+| D-40 | 링크 지오메트리 + 수집 링크 목록 | ✅ 2026-11-04 (6-0) | LINK_VERTEX_2025(5,093링크, EPSG:5181)를 `dim.dim_link` 시드로 사용(`batch/seed_dim_link.py`, 파일은 git 제외). 수집 링크 4개로 확대(sources.yaml, 450초) / 이전: 후보 "소통 돌발 도로별 링크 정보" 데이터셋. 방법은 `docs/runbooks/step0-closeout.md` 4장 | `config/sources.yaml`(링크 목록), `sql/`(`dim_link`) — Step 6 전 필수 |
 | D-41 | `RN1` 비 오는 날 응답 모양 | ❓ (H9) | 현재 `RN1` 원문은 `"0"` 6건뿐. Silver 는 `value_raw`+`value_num`+`value_unparsed` 로 대비. 비 오는 날 D-00 재실행 → `RN1_raw_values` | `docs/api-catalog/kma_ncst.md` |
 | D-42 | 심야 버스 응답 모양(0대 응답 등) | ❓ (H9) | 버스는 04~24시만 수집. 23~24시대 D-00 재실행 | `docs/api-catalog/bus_position.md` |
 | D-43 | 버스도착 `arrive_code=2` (99건/17,526)의 뜻 | ❓ | 원문 보존. Silver 생성 후 `arrive_code=2` 행의 `arrival_msg` 등 비교 | `docs/api-catalog/bus_arrival.md`, 계약 v2(D-57) |
@@ -63,7 +63,7 @@
 
 | ID | 항목 | 상태 | 어디에 추가할지 |
 |---|---|---|---|
-| D-50 | 기상청 `resultCode 03`(NO_DATA)을 오류가 아닌 "발표 전" 상태로 분류 | ⏳ (선택) | `src/urbanstream/contracts/weather.py`, `collector/runner.py`, 테스트 — Step 8 전 |
+| D-50 | 기상청 `resultCode 03`(NO_DATA)을 오류가 아닌 "발표 전" 상태로 분류 | ✅ 2026-11-04 (6-0) | KMA 03 및 버스위치 headerCd=4 를 `empty` 로 분류(실패 아님). 픽스처는 재구성본 / 이전: `src/urbanstream/contracts/weather.py`, `collector/runner.py`, 테스트 — Step 8 전 |
 | D-51 | 서울 도로소통·돌발 호출 한도 확인(미확인, 보수적 1,000건) | 👤 | `config/sources.yaml`, ADR-0004 결정 7 |
 | D-52 | 포털 호출 통계 vs `python -m collector status` 비교(상세기능 이름 `getBusPosByRtidList` vs `getBusPosByRtid`) | 👤 | ADR-0004 |
 | D-53 | 도로소통 간격 120초를 퇴근 시간대 측정으로 재확인 | 👤 (선택) | `docs/api-catalog/seoul_traffic.md` |
@@ -76,7 +76,25 @@
 
 | ID | 항목 | 상태 | 비고 |
 |---|---|---|---|
-| D-60 | `git init` + 첫 커밋 (커밋 전 `git status` 에 `.env` 없는지 확인) | 👤 ⏳ | Step 5 코드가 늘기 전에 하길 권함 (되돌리기 쉬워짐) |
-| D-61 | `SEOUL_API_KEY`·`DATA_GO_KR_KEY` 재발급 | 👤 ⏳ | 11-02, 11-03 에 `.env` 가 든 zip 업로드된 적 있음. 이번 zip 에는 `.env` 없음(확인) |
+| D-60 | `git init` + 첫 커밋 (커밋 전 `git status` 에 `.env` 없는지 확인) | ✅ 2026-11-04 | 사용자 완료(비공개 레포 catastropi/urbanstream). 단 `.gitignore` 가 data/ 안쪽 파일을 막지 못하던 결함을 6단계에서 발견·수정 → D-71 확인 필요 / 이전: Step 5 코드가 늘기 전에 하길 권함 (되돌리기 쉬워짐) |
+| D-61 | `SEOUL_API_KEY`·`DATA_GO_KR_KEY` 재발급 | 👤 확인 대기 | 사용자 3번 완료 보고, 스모크 통과. 재발급 키가 `.env` 에만 있는지 마지막 확인 / 이전: 11-02, 11-03 에 `.env` 가 든 zip 업로드된 적 있음. 이번 zip 에는 `.env` 없음(확인) |
 | D-62 | `urbanstream` conda 환경(3.11)으로 실행하는 습관 | 👤 | 11-03 확인: 프롬프트에 `(urbanstream)` 표시됨 |
 | D-63 | Tableau 사용 방식 결정(Desktop vs Public) | 👤 | Step 10 전 |
+
+## F. Step 6 (Gold / PostgreSQL) — 11-04
+
+| ID | 항목 | 상태 | 현재 알려진 것 | 확인 방법 / 어디에 |
+|---|---|---|---|---|
+| D-70 | fact 파티션 | ⏸ | 하루 수만 행이라 보류(ADR-0008 ④). 새 마이그레이션으로 추가 가능 | 행이 수천만 또는 보관 삭제가 필요해질 때 |
+| D-71 | `.gitignore` 결함: `data/*` + `!data/*/` 때문에 data/ 안쪽 파일이 추적 대상이었다 (임시 저장소로 재현) | 👤 일부 | 규칙은 `data/**` 로 수정·테스트함(`tests/unit/test_gitignore.py`) Mac: data/ 추적 해제 커밋 완료(13:30). 단 **과거 커밋이 GitHub 에 이미 있음** → 공개 전에 `git filter-repo --path data --invert-paths` 후 force push 필요. | Mac: `git ls-files data` 가 비어야 함. 나오면 `git rm -r --cached data` 후 커밋, **이미 push 했다면 레포가 비공개여도 이력에 남음** → 알려 주세요 |
+| D-72 | Mac(PG17.7/PostGIS 3.6.1)에서 `migrate.py`·통합 테스트 실행 | ✅ 2026-11-04 13시 | 개발은 PG16/PostGIS 3.4.2 에서만 통과 Mac PG17.7: migrate·시드(5,093링크, 수집 링크 4개 모두 존재)·적재 3회 통과, 재적재 멱등(스테이징 행 수 = DB 행 수). | runbook step6-gold.md 2~3절 |
+| D-73 | `spark-gold` 컨테이너(Java 17) 실행·메모리, Spark 가 Silver 폴더(스트리밍 기록)를 배치로 읽을 때 `_spark_metadata` 존중 여부 | 일부 ✅ 2026-11-04 | 샌드박스(Java 21)에서는 일반 Parquet 로만 테스트. D-21 연장 spark-gold(Java 17) 실행 성공(스테이징 약 1분 30초), Silver 폴더 배치 읽기 오류 없음. **Silver 행 수 대조(silver_verify)는 ⏳**. | 런북 3절 실행 후 `row_counts` 를 silver_verify 와 대조 |
+| D-74 | 공휴일 데이터 | ⏳ | `dim.dim_date.is_holiday` 전부 false → 베이스라인이 공휴일을 평일로 취급 | 공공데이터(특일 정보) 승인 후 시드 마이그레이션 |
+| D-75 | 버스 정류소 통과(next_stop_id 전이) 팩트 | ⏸ | 의미 미확인(D-57)이라 만들지 않음. `bus_position` 원자료는 적재됨 | 계약 v2 이후 |
+| D-76 | 돌발 `absent_since` 의 의미 | ❓ | '성공·비절단 호출에서 처음 안 보인 시각'일 뿐 해제 시각이 아님(D-38) | 하루 이상 쌓인 뒤 expected_clear_at 과 비교 |
+| D-77 | audit 에서 `skipped`(예산 소진·회로 차단) 기록은 적재하지 않음 | ⏳ | ingest_id 가 없어 PK 불가 | Step 8 DQ 설계 시 별도 표 |
+| D-78 | 베이스라인 임계값(provisional 4주 기준, 혼잡 단계) | ⏸ | 뷰는 있고 임계값 판단은 ADR-0009 | 4주 데이터 이후 |
+| D-79 | 로그인 역할(gold_writer 등) 비밀번호 설정 | 👤 | 마이그레이션은 NOLOGIN 역할만 만든다 | runbook 4절 (선택) |
+| D-80 | 수집 링크 4개 / 450초 하루 768 호출이 실제로 한도 안인지 | ❓ 진행 | 한도 1,000 은 미확인(D-51) 수집기 재시작 후 `collector status`: 도로소통 계획 768회/일(450초). 서울 포털 호출 통계와의 비교는 아직. | 서울 포털 호출 통계와 `collector status` 비교 |
+
+| D-81 | 수집기는 시작할 때만 sources.yaml 을 읽는다 → 설정 변경 뒤 재시작을 잊으면 옛 설정으로 계속 수집 (11-04: 링크 1개로 13시까지 수집됨) | 운영 규칙 | 재시작 후 `python -m collector status` 의 '계획 N회/일'로 확인. 새 링크 3개는 11-04 13:3x KST 부터 쌓임 |

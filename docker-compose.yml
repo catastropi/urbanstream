@@ -154,6 +154,21 @@ services:
       start_period: 90s
     mem_limit: ${SPARK_SILVER_MEM_LIMIT:-1536m}
 
+  # Step 6: Gold 스테이징 (일회성 배치 — `docker compose up` 으로 뜨지 않는다. scripts/gold_run.sh 가 `run --rm` 으로 실행).
+  # DB 비밀번호를 주지 않는다: Spark 는 Parquet 만 만들고, DB 적재는 호스트 Python(batch/gold_load.py)이 한다 (ADR-0008 ⑤).
+  # Silver·Bronze 는 읽기 전용 마운트 (폴더 규칙, DEFERRED D-21).
+  spark-gold:
+    <<: *restart
+    profiles: ["gold"]
+    image: urbanstream/spark-bronze:${SPARK_VERSION:-4.1.3}
+    container_name: urbanstream-spark-gold
+    command: ["/opt/spark/bin/spark-submit", "--master", "local[2]", "--driver-memory", "1g", "/app/batch/gold_stage.py"]
+    volumes:
+      - ./data/bronze:/data/bronze:ro
+      - ./data/silver:/data/silver:ro
+      - ./data/gold_stage:/data/gold_stage
+    mem_limit: ${SPARK_GOLD_MEM_LIMIT:-1536m}
+
 volumes:
   postgres-data:
   kafka-data:

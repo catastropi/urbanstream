@@ -4,7 +4,8 @@ import json
 import random
 from datetime import timedelta
 
-from collector_helpers import KEYS, T0, Clock, FakeFetcher, body, make_collector, net_error, ok, router_for_fixtures, target
+from collector_helpers import (KEYS, T0, Clock, FakeFetcher, body, fixture_bytes, make_collector, net_error, ok,
+                               router_for_fixtures, target)
 
 from collector.config import load_config
 from collector.publisher import MemoryPublisher
@@ -206,8 +207,10 @@ def test_run_forever_respects_intervals_and_weather_dedup(tmp_path):
     assert 600 <= elapsed <= 1250
     assert by("getUltraSrtNcst") == 1                                          # 같은 발표 시각은 한 번만
     iv = lambda name: CFG.sources[name].interval_sec        # 간격은 sources.yaml 값을 따른다 (측정으로 바뀔 수 있음)
-    assert abs(by("TrafficInfo") - elapsed / iv("seoul_traffic")) <= 2
-    assert abs(by("getBusPosByRtid") - elapsed / iv("bus_position")) <= 2
+    n = lambda name: len(CFG.sources[name].targets)          # 대상(링크·노선) 수도 설정을 따른다 — 호출 수는 대상마다 따로 센다 (2026-11-04: 링크 4개)
+    # 대상마다 시작할 때 1회 + 간격마다 1회. 시작 시각 어긋남(스태거·지터)만큼 오차를 허용한다.
+    assert abs(by("TrafficInfo") - n("seoul_traffic") * (elapsed / iv("seoul_traffic") + 1)) <= n("seoul_traffic")
+    assert abs(by("getBusPosByRtid") - n("bus_position") * (elapsed / iv("bus_position") + 1)) <= n("bus_position")
     assert len(audits(pub)) == len(fetcher.calls)                              # 호출마다 audit 1건
 
 
@@ -218,3 +221,31 @@ def test_audit_carries_parser_stats_and_odd_flag_values_do_not_cause_dlq(tmp_pat
     assert rep.outcome == "ok" and rep.n_rejects == 0 and not pub.by_topic("urban.dlq.v1")
     a = audits(pub)[-1]
     assert a["parse_stats"]["empty_slots"] == 15 and a["parse_stats"]["unexpected_flag_values"] == 0
+
+
+# ------------------------------------------------------------------ 빈 응답은 실패가 아니다 (2026-11-04)
+def test_bus_position_no_result_is_ok_without_retry_and_never_trips_the_breaker(tmp_path):
+    empty = body(fixture_bytes("bus_position/empty_code4_20261104T024101.xml"))
+    c, pub, fetcher, clock, sleeps = make_collector(tmp_path, [empty])
+    for _ in range(8):                                  # 연속 8번 (회로차단 임계값 5 보다 많이)
+        rep = c.run_target(POS)
+        assert rep.outcome == "ok" and rep.n_records == 0 and rep.attempts == 1
+        clock.advance(90)
+    assert len(fetcher.calls) == 8 and not sleeps      # 호출 1회/사이클, 백오프 대기 없음
+    last = audits(pub)[-1]
+    assert last["status_kind"] == "empty" and last["status_code"] == "4" and last["outcome"] == "ok"
+    assert not pub.by_topic("urban.dlq.v1") and not pub.by_topic("urban.bus.position.v1")
+    assert c.budget.used("bus_position") == 8
+
+
+def test_weather_no_data_is_retried_next_cycle_not_marked_as_fetched(tmp_path):
+    nodata = body(fixture_bytes("kma_ncst/nodata_03_20261103T160200.json"))
+    good = ok("kma_ncst/ok_20261028T150951.json")
+    c, pub, fetcher, clock, sleeps = make_collector(tmp_path, [nodata, good])
+    rep = c.run_target(KMA)
+    assert rep.outcome == "ok" and rep.n_records == 0 and not sleeps         # 재시도·대기 없음
+    assert c.should_skip(KMA, clock()) is None                               # 발표 시각을 '받음'으로 기록하지 않았다 → 다음 주기에 다시 부른다
+    assert audits(pub)[-1]["status_kind"] == "empty" and not pub.by_topic("urban.dlq.v1")
+    clock.advance(600)
+    assert c.run_target(KMA).n_records == 8                                  # 이번엔 데이터가 있다
+    assert c.should_skip(KMA, clock()) == "base_already_fetched"             # 이제서야 중복 호출 방지가 걸린다

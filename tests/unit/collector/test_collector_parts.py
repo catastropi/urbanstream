@@ -224,8 +224,12 @@ def test_scheduler_staggers_start_and_respects_windows():
     cfg = load_config(env={})
     srcs = [cfg.sources[n] for n in ("seoul_traffic", "bus_position", "kma_ncst")]
     s = Scheduler(srcs, T0, stagger_sec=3.0, rng=random.Random(0))
-    assert [t.source for t in s.pop_ready(T0)] == ["seoul_traffic"]            # 처음에는 하나만
-    assert {t.source for t in s.pop_ready(T0 + timedelta(seconds=6))} == {"seoul_traffic", "bus_position", "kma_ncst"}
+    # 대상(링크·노선·격자) 하나마다 3초씩 어긋나게 시작한다 (같은 서버에 한꺼번에 몰아 부르지 않는다). 링크가 여러 개여도 같은 규칙.
+    traffic_keys = [x.key for x in cfg.sources["seoul_traffic"].targets]
+    n_targets = sum(len(x.targets) for x in srcs)
+    assert [t.key for t in s.pop_ready(T0)] == traffic_keys[:1]                  # 처음에는 하나만
+    assert [t.key for t in s.pop_ready(T0 + timedelta(seconds=3))] == traffic_keys[:2]   # 3초 뒤에 하나 더 (링크 2개 이상일 때)
+    assert {t.source for t in s.pop_ready(T0 + timedelta(seconds=3.0 * n_targets))} == {"seoul_traffic", "bus_position", "kma_ncst"}
     night = datetime(2026, 11, 2, 2, 0, tzinfo=KST)                              # 버스 활성 시간(04:00~) 밖
     s2 = Scheduler([cfg.sources["bus_position"]], night, rng=random.Random(0))
     assert s2.pop_ready(night) == []

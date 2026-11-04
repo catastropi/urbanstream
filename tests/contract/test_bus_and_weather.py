@@ -187,3 +187,30 @@ def test_arrival_key_distinguishes_snapshots_within_the_same_minute():
     assert keys["02"].isdisjoint(keys["19"]) and keys["19"].isdisjoint(keys["39"]) and keys["02"].isdisjoint(keys["39"])
     again = run("bus_arrival/ok_20261101T215321.xml", body=raw.replace("21:53:00.0</mkTm>", "21:53:19.0</mkTm>"))
     assert {r.envelope.dedup_key for r in again.records} == keys["19"]     # 같은 스냅샷을 다시 받으면 같은 키
+
+
+# ------------------------------------------------------------------ 빈 응답 분류 (2026-11-04, ADR-0008 결정 9)
+def test_bus_position_header_code_4_no_result_is_empty_not_unknown():
+    res = run("bus_position/empty_code4_20261104T024101.xml")
+    assert res.status.kind == "empty" and res.status.code == "4" and res.ok and res.records == []
+    assert "결과가 없습니다" in res.status.message
+
+
+def test_bus_position_other_nonzero_codes_stay_unknown():
+    xml = run.__globals__["read_fixture"]("bus_position/empty_code4_20261104T024101.xml").decode("utf-8")
+    other = xml.replace("<headerCd>4</headerCd>", "<headerCd>5</headerCd>")
+    res = run("bus_position/empty_code4_20261104T024101.xml", body=other)
+    assert res.status.kind == "unknown" and res.status.code == "5" and not res.ok
+
+
+def test_bus_position_code_4_with_rows_is_not_trusted_as_empty():
+    # 코드가 4 인데 행이 있으면 (모양을 모르는 응답) 비어 있다고 단정하지 않는다
+    ok_xml = run.__globals__["read_fixture"]("bus_position/ok_20261101T215320.xml").decode("utf-8")
+    weird = ok_xml.replace("<headerCd>0</headerCd>", "<headerCd>4</headerCd>")
+    res = run("bus_position/ok_20261101T215320.xml", body=weird)
+    assert res.status.kind == "unknown"
+
+
+def test_weather_result_code_03_no_data_is_empty_not_unknown():
+    res = run("kma_ncst/nodata_03_20261103T160200.json")
+    assert res.status.kind == "empty" and res.status.code == "03" and res.ok and res.records == []
