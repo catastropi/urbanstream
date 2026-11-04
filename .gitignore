@@ -5,7 +5,7 @@ __pycache__/
 .DS_Store
 
 # data/ 아래 실제 데이터는 git에 올리지 않지만, 폴더 구조(.gitkeep)는 유지한다.
-data/*
-!data/*/
+data/**
+!data/**/
 !data/**/.gitkeep
 .pytest_cache/
