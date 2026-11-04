@@ -31,9 +31,23 @@ def _gen_cluster_id() -> str:
     return base64.urlsafe_b64encode(uuid.uuid4().bytes).decode().rstrip("=")
 
 
+def _gen_fernet_key() -> str:
+    # Airflow Fernet 키: 32바이트 무작위의 urlsafe base64 (44자)
+    return base64.urlsafe_b64encode(secrets.token_bytes(32)).decode()
+
+
+def _gen_secret() -> str:
+    return secrets.token_urlsafe(32)
+
+
 GENERATORS: dict[str, Callable[[], str]] = {
     "POSTGRES_PASSWORD": _gen_password,
     "KAFKA_CLUSTER_ID": _gen_cluster_id,
+    "AIRFLOW_DB_PASSWORD": _gen_password,
+    "GOLD_LOADER_PASSWORD": _gen_password,
+    "AIRFLOW_FERNET_KEY": _gen_fernet_key,
+    "AIRFLOW_JWT_SECRET": _gen_secret,
+    "AIRFLOW_ADMIN_PASSWORD": _gen_password,
 }
 
 

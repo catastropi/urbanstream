@@ -14,7 +14,8 @@ CORE = ("postgres", "kafka")
 
 
 def test_expected_services_and_profiles():
-    assert set(SERVICES) == {"postgres", "kafka", "kafka-ui", "spark-bronze", "spark-silver", "spark-gold"}
+    assert set(SERVICES) == {"postgres", "kafka", "kafka-ui", "spark-bronze", "spark-silver", "spark-gold",
+                             "airflow-scheduler", "airflow-apiserver", "airflow-dag-processor"}
     assert SERVICES["postgres"]["profiles"] == ["core"] and SERVICES["kafka"]["profiles"] == ["core"]
     assert SERVICES["kafka-ui"]["profiles"] == ["dev"]
     assert SERVICES["spark-bronze"]["profiles"] == ["streaming"]    # core 만 켜면 Spark 는 뜨지 않는다 (메모리)
@@ -75,7 +76,8 @@ def test_compose_file_is_valid_for_docker(tmp_path):
     if probe.returncode != 0:
         pytest.skip("docker compose 플러그인 없음")
     env = tmp_path / "t.env"
-    env.write_text("POSTGRES_PASSWORD=dummy\nKAFKA_CLUSTER_ID=C7xqjrvSS4upP61um16UhQ\nCOMPOSE_PROFILES=core,dev\n")
+    env.write_text("POSTGRES_PASSWORD=dummy\nKAFKA_CLUSTER_ID=C7xqjrvSS4upP61um16UhQ\nCOMPOSE_PROFILES=core,dev,airflow\n"
+                   "AIRFLOW_FERNET_KEY=x\nAIRFLOW_JWT_SECRET=x\nAIRFLOW_DB_PASSWORD=x\nGOLD_LOADER_PASSWORD=x\nAIRFLOW_ADMIN_PASSWORD=x\n")
     r = subprocess.run(["docker", "compose", "--env-file", str(env), "-f", str(ROOT / "docker-compose.yml"), "config", "-q"],
                        capture_output=True, text=True, cwd=ROOT)
     assert r.returncode == 0, r.stderr
@@ -204,3 +206,73 @@ def test_gold_mounts_silver_and_bronze_read_only_and_writes_only_gold_stage():
 def test_dockerfile_copies_batch_code_only_not_sql_scripts_or_db_loader_secrets():
     copies = re.findall(r"^COPY (.+)$", DOCKERFILE, re.M)
     assert "batch /app/batch" in copies and not any(c.startswith(("sql", "scripts", ".env")) for c in copies)
+
+
+# ---------------------------------------------------------------- Step 7: Airflow
+
+AIRFLOW = {n: SERVICES[n] for n in ("airflow-scheduler", "airflow-apiserver", "airflow-dag-processor")}
+AF_DOCKERFILE = (ROOT / "docker" / "airflow" / "Dockerfile").read_text(encoding="utf-8")
+
+
+def test_airflow_services_are_opt_in_via_profile():
+    for name, svc in AIRFLOW.items():
+        assert svc["profiles"] == ["airflow"], f"{name}: core 만 켜면 Airflow 가 뜨지 않아야 합니다 (메모리)"
+
+
+def test_airflow_secrets_are_required_from_env_and_no_env_file_or_docker_sock():
+    env = AIRFLOW["airflow-scheduler"]["environment"]
+    for key in ("AIRFLOW__CORE__FERNET_KEY", "AIRFLOW__API_AUTH__JWT_SECRET", "GOLD_WRITER_PASSWORD", "AIRFLOW_ADMIN_PASSWORD"):
+        assert re.fullmatch(r"\$\{[A-Z_]+:\?.+\}", env[key]), f"{key}: .env 에서 필수로 읽어야 합니다"
+    assert ":?" in env["AIRFLOW__DATABASE__SQL_ALCHEMY_CONN"]
+    for name, svc in AIRFLOW.items():
+        assert "env_file" not in svc, f"{name}: .env 전체(API 키 포함)가 컨테이너에 들어갑니다"
+        assert not any("docker.sock" in v for v in svc.get("volumes", [])), f"{name}: docker.sock 마운트 금지"
+        assert svc.get("privileged") is not True
+
+
+def test_airflow_uses_least_privilege_db_role_not_admin():
+    env = AIRFLOW["airflow-scheduler"]["environment"]
+    assert env["GOLD_WRITER_USER"] == "gold_loader"
+    assert "POSTGRES_PASSWORD" not in env and "POSTGRES_USER" not in env, "업무 DB 관리자 계정을 Airflow 에 주지 마세요 (D-79)"
+    assert "@postgres:5432/airflow" in env["AIRFLOW__DATABASE__SQL_ALCHEMY_CONN"], "메타데이터는 별도 DB(airflow)"
+
+
+def test_airflow_data_mounts_are_read_only_except_stage_and_logs():
+    for name, svc in AIRFLOW.items():
+        for v in svc["volumes"]:
+            src, dst, *mode = v.split(":")
+            rw = not mode or mode[0] != "ro"
+            if rw:
+                assert dst in ("/data/gold_stage", "/opt/airflow/logs"), f"{name}: {v} 는 읽기 전용이어야 합니다"
+        assert any(v.startswith("./data/silver:/data/silver:ro") for v in svc["volumes"])
+        assert any(v.startswith("./data/bronze:/data/bronze:ro") for v in svc["volumes"])
+
+
+def test_airflow_scheduler_memory_covers_spark_heap_and_start_order():
+    sch = AIRFLOW["airflow-scheduler"]
+    # gold_stage 의 Spark JVM 이 스케줄러 컨테이너 안에서 뜬다: 힙(batch/jobs.py 의 driver-memory) × 1.4 + Airflow 자신 몫
+    jobs_src = (ROOT / "batch" / "jobs.py").read_text(encoding="utf-8")
+    heap = _mem_mib(re.search(r'driver_memory: str = "(\d+[gm])"', jobs_src).group(1))
+    limit = _mem_mib(_default(sch["mem_limit"]))
+    assert limit >= heap * 1.4 + 1024, f"스케줄러 한도({limit} MiB) 가 Spark 힙({heap} MiB)×1.4 + Airflow 1 GiB 보다 작습니다"
+    for name in ("airflow-apiserver", "airflow-dag-processor"):
+        assert AIRFLOW[name]["depends_on"]["airflow-scheduler"]["condition"] == "service_healthy"
+    assert sch["depends_on"]["postgres"]["condition"] == "service_healthy"
+    assert "service_completed_successfully" not in (ROOT / "docker-compose.yml").read_text(encoding="utf-8").replace(
+        "(Compose v2.10 에서 service_completed_successfully", "")  # 구버전 Compose 에서 불안정
+
+
+def test_airflow_scheduler_prepares_db_user_and_single_slot_pool():
+    cmd = "\n".join(AIRFLOW["airflow-scheduler"]["command"])
+    assert "airflow db migrate" in cmd and "airflow pools set gold_io 1" in cmd and "scheduler" in cmd
+    assert "$$AIRFLOW_ADMIN_PASSWORD" in cmd, "비밀번호를 명령줄에 직접 쓰지 말고 환경 변수로 넘기세요"
+    assert AIRFLOW["airflow-apiserver"]["ports"] == ["127.0.0.1:${AIRFLOW_UI_PORT:-8080}:8080"]
+
+
+def test_airflow_dockerfile_pins_versions_and_uses_constraints():
+    assert re.search(r"^ARG AIRFLOW_IMAGE=apache/airflow:\d+\.\d+\.\d+-python\d+\.\d+$", AF_DOCKERFILE, re.M)
+    assert "--constraint" in AF_DOCKERFILE and "constraints-${AIRFLOW_VERSION}" in AF_DOCKERFILE
+    assert re.search(r"pyspark==\$\{PYSPARK_VERSION\}", AF_DOCKERFILE)
+    assert "default-jre-headless" in AF_DOCKERFILE
+    pyspark_default = re.search(r"^ARG PYSPARK_VERSION=(\S+)$", AF_DOCKERFILE, re.M).group(1)
+    assert pyspark_default == _default(SPARK["build"]["args"]["SPARK_VERSION"]), "Silver/Bronze 의 Spark 와 같은 버전이어야 합니다"

@@ -32,11 +32,12 @@ def test_failed_migration_rolls_back_only_that_file(pg, tmp_path):
     d = tmp_path / "sql"; d.mkdir()
     for n, p, _ in discover(ROOT / "sql"):
         (d / n).write_text(p.read_text())
-    (d / "006_bad.sql").write_text("CREATE TABLE ops.t6 (a int); SELECT 1/0;")
+    bad = f"{int(max(n[:3] for n, _, _ in discover(ROOT / 'sql'))) + 1:03d}_bad.sql"      # 다음 번호 (실제 마이그레이션이 늘어도 겹치지 않게)
+    (d / bad).write_text("CREATE TABLE ops.t6 (a int); SELECT 1/0;")
     with pytest.raises(Exception):
         migrate(pg, d)
     assert pg.execute("SELECT to_regclass('ops.t6')").fetchone()[0] is None
-    assert pg.execute("SELECT count(*) FROM ops.schema_migrations WHERE name='006_bad.sql'").fetchone()[0] == 0
+    assert pg.execute("SELECT count(*) FROM ops.schema_migrations WHERE name=%s", (bad,)).fetchone()[0] == 0
 
 
 def test_seed_dim_link_geometry_and_upsert(pg):

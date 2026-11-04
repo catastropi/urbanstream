@@ -16,7 +16,9 @@ EXAMPLE = (ROOT / ".env.example").read_text(encoding="utf-8")
 def test_example_has_stack_section_with_expected_keys():
     keys = [k for k, _ in stack_env.stack_defaults(EXAMPLE)]
     assert keys == ["COMPOSE_PROFILES", "POSTGRES_USER", "POSTGRES_DB", "POSTGRES_PASSWORD", "POSTGRES_PORT",
-                    "KAFKA_EXTERNAL_PORT", "KAFKA_UI_PORT", "KAFKA_CLUSTER_ID"]
+                    "KAFKA_EXTERNAL_PORT", "KAFKA_UI_PORT", "KAFKA_CLUSTER_ID",
+                    "AIRFLOW_UI_PORT", "AIRFLOW_ADMIN_USER", "AIRFLOW_ADMIN_PASSWORD", "AIRFLOW_DB_PASSWORD",
+                    "GOLD_LOADER_PASSWORD", "AIRFLOW_FERNET_KEY", "AIRFLOW_JWT_SECRET"]
     assert dict(stack_env.stack_defaults(EXAMPLE))["POSTGRES_PASSWORD"] == ""  # 예제에 비밀번호를 적어 두지 않는다
 
 
@@ -28,6 +30,12 @@ def test_adds_missing_keys_generates_secrets_and_keeps_other_lines_untouched():
     values = dict(line.split("=", 1) for line in new.splitlines() if "=" in line)
     assert len(values["POSTGRES_PASSWORD"]) == 32 and re.fullmatch(r"[0-9a-f]{32}", values["POSTGRES_PASSWORD"])
     assert re.fullmatch(r"[A-Za-z0-9_-]{22}", values["KAFKA_CLUSTER_ID"])  # KRaft 클러스터 ID 형식
+    import base64
+    assert len(base64.urlsafe_b64decode(values["AIRFLOW_FERNET_KEY"])) == 32 and len(values["AIRFLOW_FERNET_KEY"]) == 44  # Fernet 키 형식
+    for k in ("AIRFLOW_DB_PASSWORD", "GOLD_LOADER_PASSWORD", "AIRFLOW_ADMIN_PASSWORD"):
+        assert re.fullmatch(r"[0-9a-f]{32}", values[k]), k
+    assert len(values["AIRFLOW_JWT_SECRET"]) >= 32
+    assert len({values[k] for k in ("POSTGRES_PASSWORD", "AIRFLOW_DB_PASSWORD", "GOLD_LOADER_PASSWORD", "AIRFLOW_ADMIN_PASSWORD")}) == 4  # 서로 달라야 한다
     assert values["POSTGRES_PORT"] == "5433" and values["COMPOSE_PROFILES"] == "core"
 
 
