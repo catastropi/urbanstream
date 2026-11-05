@@ -1,0 +1,35 @@
+# 알림 정책 (Step 8, ADR-0010 D8-3/D8-4/D8-5). 숫자는 모두 [가정] 시작값이다 — 1주 뒤 ops.alert_event 통계로 조정한다.
+# 이 파일을 지우거나 키가 빠져도 코드의 기본값(src/urbanstream/notify/policy.py)이 같은 값으로 동작한다.
+version: 1
+
+# 푸시(웹훅 즉시 전송) 대상 수준. 그 밖(warning, info)은 매일 아침 요약 1건에 묶는다.
+push_levels: [error, critical]
+
+# 같은 dedup_key 를 다시 보내지 않는 시간(초). 억제된 횟수는 ops.alert_state.suppressed_count 에 쌓인다.
+cooldown_sec:
+  critical: 1800
+  error: 7200
+  warning: 21600     # 요약(digest)에 같은 경고가 반복해서 실리지 않게
+
+# 열려 있는 warning 이 이 시간 넘게 이어지면 error 로 올린다.
+escalate_warning_after_sec: 86400
+
+# 시간당 푸시 상한. 넘으면 억제하고 다음 요약에 "N건 억제"로 남긴다.
+max_push_per_hour: 10
+
+# DAG 실패 콜백은 즉시 보내지 않고 pending 으로 기록한다. 감시 루프가 이 시간 뒤 잠자기 증거와 대조해 분류한 뒤 보낸다.
+pending_grace_sec: 60
+# 감시 루프가 죽어 있어도 이 시간이 지난 pending 은 dq_report_daily 가 error 그대로 내보낸다(의심스러우면 격하하지 않는다).
+pending_flush_after_sec: 600
+
+# 매일 아침 요약 시각(KST)
+digest_time_kst: "07:30"
+
+# 잠자기·전체 중단 규칙 (D-104)
+stall:
+  min_slept_sec: 120          # host_resume 의 잠든 시간이 이보다 짧으면 증거로 쓰지 않는다
+  blackout_min_sec: 600       # 모든 소스의 호출 기록이 동시에 이만큼 없으면 collector_blackout
+  overlap_margin_sec: 600     # 태스크 실행 구간과 중단 구간이 이 여유를 두고 겹치면 겹친 것으로 본다
+  long_stall_sec: 21600       # 이보다 긴 중단은 데이터 품질 사건이라 error 1건
+  group_window_sec: 1800      # collector_blackout 과 겹친 실패는 이 시간 안에서 1건으로 묶는다
+  post_gap_grace_sec: 600     # 중단이 끝난 뒤 이 시간 동안은 소스 신선도 알림을 보내지 않는다(수집기가 다시 호출하는 시간)

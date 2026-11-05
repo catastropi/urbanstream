@@ -226,10 +226,12 @@ def _default_connect():
     return psycopg.connect(conninfo(role="writer"), autocommit=True)
 
 
-def run_load(stage_dir: Path, *, refresh_mart: bool = False, connect: Optional[Callable[[], Any]] = None) -> dict:
+def run_load(stage_dir: Path, *, refresh_mart: bool = False, connect: Optional[Callable[[], Any]] = None,
+             dag_id: Optional[str] = None) -> dict:
     from batch.gold_load import load_all
+    extra = {"dag_id": dag_id} if dag_id is not None else {}            # 모르면 넘기지 않는다 → 009 이전 호출 모양과 같다
     with (connect or _default_connect)() as conn:
-        return load_all(conn, Path(stage_dir), refresh_mart=refresh_mart)
+        return load_all(conn, Path(stage_dir), refresh_mart=refresh_mart, **extra)
 
 
 def refresh_marts(*, connect: Optional[Callable[[], Any]] = None) -> None:
@@ -290,14 +292,18 @@ def process_window(d0: date, d1: date, *, dag_id: str, run_id: str, try_number: 
     warnings = check_manifest(manifest, d0, d1, started_at=started)
     for w in warnings:
         LOG.warning(w)
-    loaded = load(sd, refresh_mart=refresh_mart)
+    loaded = load(sd, refresh_mart=refresh_mart, dag_id=dag_id)
     counts = verify(manifest, d0, d1)
     cleanup_stage(base, sd)
     return {"window": [d0.isoformat(), d1.isoformat()], "run_id": loaded.get("run_id"), "counts": counts, "warnings": warnings}
 
 
 def on_failure(context: Mapping[str, Any]) -> None:
-    """Airflow on_failure_callback. 알림 함수(urbanstream.notify.send)로 넘긴다 — 내용은 Step 8 에서 확장."""
+    """Airflow on_failure_callback. 실패를 'pending' 으로 기록만 한다 — 보낼지·격하할지는 모니터가 잠자기 증거와 대조해 정한다 (ADR-0010 D8-5).
+
+    pending 기록이 실패하면(DB 불가 등) 기존 notify.send 로 대체한다 → 실패 알림이 사라지는 일은 없다.
+    알림이 이 콜백을 깨뜨리면 안 되므로 어떤 예외도 밖으로 내보내지 않는다.
+    """
     from urbanstream import notify
     ti = context.get("ti") or context.get("task_instance")
     dag_id = getattr(ti, "dag_id", None) or (context.get("dag") and getattr(context["dag"], "dag_id", "?")) or "?"
@@ -305,4 +311,14 @@ def on_failure(context: Mapping[str, Any]) -> None:
     run_id = context.get("run_id") or getattr(ti, "run_id", "?")
     exc = context.get("exception")
     body = f"run_id={run_id} try={getattr(ti, 'try_number', '?')} {type(exc).__name__ if exc else ''}: {exc if exc else ''}"
-    notify.send("error", f"Airflow 실패: {dag_id}.{task_id}", body, dedup_key=f"airflow:{dag_id}.{task_id}")
+    title, key = f"Airflow 실패: {dag_id}.{task_id}", f"airflow:{dag_id}.{task_id}"
+    meta = {"dag_id": str(dag_id), "task_id": str(task_id), "run_id": str(run_id), "try_number": getattr(ti, "try_number", None)}
+    for name, attr in (("started_at", "start_date"), ("ended_at", "end_date")):
+        v = getattr(ti, attr, None)
+        if hasattr(v, "isoformat"):
+            meta[name] = v.isoformat()
+    try:
+        if not notify.enqueue("error", title, body, dedup_key=key, meta=meta):
+            notify.send("error", title, body, dedup_key=key)
+    except Exception:                                                        # noqa: BLE001
+        LOG.exception("실패 알림 기록 중 오류 (무시)")

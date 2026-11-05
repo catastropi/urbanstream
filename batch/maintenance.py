@@ -53,6 +53,26 @@ def snapshot_table_stats(snapshot_date: Optional[date] = None, *, connect: Optio
     return n
 
 
+# Step 8 감시 표의 보관 기간(일). call_event 는 양이 많아 짧게(시간 단위 롤업 source_health 가 추이를 남긴다), 나머지는 retention_days.
+MONITOR_RETENTION = {"call_event": 30, "source_health": 90}
+
+
+def prune_monitor_tables(conn, retention_days: int) -> dict:
+    """009/010/011 표 정리. 아직 만들어지지 않은 표(마이그레이션 전)는 건너뛴다. 해소되지 않은 알림 상태(open)는 지우지 않는다."""
+    out = {}
+    have = {(r[0], r[1]) for r in conn.execute("SELECT table_schema, table_name FROM information_schema.tables WHERE table_schema IN ('ops','mart')").fetchall()}
+    plan = [("ops", "call_event", "recorded_at", MONITOR_RETENTION["call_event"]), ("ops", "source_health", "bucket_start", MONITOR_RETENTION["source_health"]),
+            ("ops", "alert_event", "created_at", retention_days), ("ops", "data_gap", "detected_at", retention_days), ("ops", "dq_result", "checked_at", retention_days),
+            ("mart", "anomaly_event", "detected_at", retention_days)]
+    for schema, table, col, days in plan:
+        if (schema, table) in have:
+            out[table] = conn.execute(f"DELETE FROM {schema}.{table} WHERE {col} < now() - make_interval(days => %s)", (max(days, 1),)).rowcount
+    if ("ops", "alert_state") in have:
+        out["alert_state"] = conn.execute("DELETE FROM ops.alert_state WHERE status='resolved' AND last_at < now() - make_interval(days => %s)",
+                                          (retention_days,)).rowcount
+    return out
+
+
 def prune_ops(*, retention_days: int = RETENTION_DAYS, connect: Optional[Callable[[], Any]] = None) -> dict:
     """retention_days 보다 오래된 적재 이력·호출 감사·표 통계를 지운다. 실행 중(running) 적재 이력은 남긴다."""
     if retention_days < 30:
@@ -64,5 +84,6 @@ def prune_ops(*, retention_days: int = RETENTION_DAYS, connect: Optional[Callabl
                          (retention_days,)).rowcount
         c = conn.execute("DELETE FROM ops.table_stats WHERE snapshot_date < (now() AT TIME ZONE 'Asia/Seoul')::date - %s",
                          (retention_days,)).rowcount
-    LOG.info("운영 기록 정리(%d일): load_run %d, call_audit %d, table_stats %d", retention_days, a, b, c)
-    return {"load_run": a, "call_audit": b, "table_stats": c, "retention_days": retention_days}
+        extra = prune_monitor_tables(conn, retention_days)
+    LOG.info("운영 기록 정리(%d일): load_run %d, call_audit %d, table_stats %d, 감시 %s", retention_days, a, b, c, extra)
+    return {"load_run": a, "call_audit": b, "table_stats": c, "retention_days": retention_days, **extra}

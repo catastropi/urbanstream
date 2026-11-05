@@ -10,7 +10,8 @@ from airflow.dag_processing.dagbag import DagBag  # noqa: E402
 
 DAGS = Path(__file__).resolve().parents[2] / "dags"
 EXPECTED = {"gold_intraday", "gold_daily", "backfill", "bus_delay", "baseline_build",
-            "incident_impact_finalize", "weather_traffic_analysis", "warehouse_maintenance"}
+            "incident_impact_finalize", "weather_traffic_analysis", "warehouse_maintenance",
+            "dq_report_daily", "silver_reconcile_daily", "anomaly_scan"}
 
 
 @pytest.fixture(scope="module")
@@ -36,7 +37,7 @@ def test_policies(bag):
 
 
 def test_heavy_tasks_use_the_single_slot_pool(bag):
-    for dag_id, task_id in (("gold_intraday", "run"), ("gold_daily", "run"), ("backfill", "one_day")):
+    for dag_id, task_id in (("gold_intraday", "run"), ("gold_daily", "run"), ("backfill", "one_day"), ("silver_reconcile_daily", "reconcile")):
         assert bag.dags[dag_id].get_task(task_id).pool == "gold_io", (dag_id, task_id)
 
 
@@ -49,6 +50,9 @@ def test_schedules(bag):
     assert bag.dags["incident_impact_finalize"].schedule == "0 3 * * *"
     assert bag.dags["weather_traffic_analysis"].schedule == "30 3 * * *"
     assert bag.dags["warehouse_maintenance"].schedule == "0 4 * * 0"
+    assert bag.dags["dq_report_daily"].schedule == "0 5 * * *"          # gold_daily(01:00)·마트(02:00~03:30)·재대조(04:30) 뒤
+    assert bag.dags["silver_reconcile_daily"].schedule == "30 4 * * *"
+    assert bag.dags["anomaly_scan"].schedule == "35 * * * *"            # gold_intraday(매시 20분) 뒤
 
 
 def test_backfill_params_have_date_pattern(bag):

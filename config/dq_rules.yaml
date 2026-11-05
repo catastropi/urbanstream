@@ -1,0 +1,39 @@
+# 데이터 품질(DQ) 규칙 (Step 8b, ADR-0010 D8-9/D8-10). 매일 05:00 KST 에 전날(KST)을 검사한다 (DAG dq_report_daily).
+# ★ 숫자는 모두 [가정] 시작값이다. 7일 관찰(shadow) 동안 ops.v_dq_latest 의 value 분포를 보고 보정한다 (docs/DEFERRED.md D-121).
+# ★ shadow_until 까지는 어떤 규칙도 알림·마트 차단을 하지 않는다 (기록만). 'mode: enforce' 를 적은 규칙만 바로 적용한다.
+# ★ action: record = 기록만 / alert = fail 이면 알림(severity 가 error 면 푸시, warning 이면 아침 요약) / block_mart = 마트 DAG 의 시작 전 점검(check_upstream)에서 막는다.
+#   block_mart 는 '시각이 미래인 행' 규칙에만 허용한다(린터가 검사). 나머지는 틀려도 잠깐 지연될 뿐 마트를 멈출 이유가 없다.
+# 빈 표·표본 부족은 pass 가 아니라 unknown 이다.
+version: 1
+shadow_until: "2026-11-12"
+rules:
+  # ---------------------------------------------------------------- 결측·범위·플래그
+  - {id: traffic_speed_null_rate, kind: null_rate, severity: warning, action: alert, table: fact.traffic_speed, date_col: event_date, column: speed_kmh, max_rate: 0.05, min_rows: 50}
+  - {id: traffic_speed_range, kind: range, severity: warning, action: alert, table: fact.traffic_speed, date_col: event_date, column: speed_kmh, min: 0, max: 150, max_out_rate: 0.001, min_rows: 50}
+  - {id: traffic_speed_zero_share, kind: flag_rate, severity: info, action: record, table: fact.traffic_speed, date_col: event_date, flag: speed_zero, max_rate: 0.3, min_rows: 50}
+  - {id: bus_position_range_lat, kind: range, severity: warning, action: alert, table: fact.bus_position, date_col: event_date, column: lat, min: 33.0, max: 39.0, max_out_rate: 0.001, min_rows: 50}
+  - {id: bus_position_range_lon, kind: range, severity: warning, action: alert, table: fact.bus_position, date_col: event_date, column: lon, min: 124.0, max: 132.0, max_out_rate: 0.001, min_rows: 50}
+  - {id: bus_arrival_zero_share, kind: flag_rate, severity: info, action: record, table: fact.bus_arrival, date_col: event_date, flag: arrive_zero, max_rate: 0.5, min_rows: 50}
+  - {id: weather_range_t1h, kind: range, severity: warning, action: alert, table: fact.weather_obs, date_col: event_date, column: t1h, min: -40, max: 50, max_out_rate: 0.0, min_rows: 3}
+  - {id: incident_obs_geom_null_rate, kind: null_rate, severity: info, action: record, table: fact.incident_observation, date_col: observed_date, column: geom, max_rate: 0.2, min_rows: 20}
+  # ---------------------------------------------------------------- 시간 이상 (마트를 막을 수 있는 유일한 종류)
+  - {id: traffic_future_event, kind: future_time, severity: error, action: block_mart, table: fact.traffic_speed, date_col: event_date, ts_col: event_time, fetched_col: fetched_at, margin_sec: 600, max_count: 0}
+  - {id: bus_position_future_event, kind: future_time, severity: error, action: block_mart, table: fact.bus_position, date_col: event_date, ts_col: event_time, fetched_col: fetched_at, margin_sec: 600, max_count: 0}
+  - {id: bus_arrival_future_event, kind: future_time, severity: error, action: block_mart, table: fact.bus_arrival, date_col: event_date, ts_col: event_time, fetched_col: fetched_at, margin_sec: 600, max_count: 0}
+  # ---------------------------------------------------------------- 분량·커버리지 (수집 공백(ops.data_gap)으로 설명되면 fail 대신 warn)
+  - {id: traffic_hour_coverage, kind: hour_coverage, severity: warning, action: alert, table: fact.traffic_speed, date_col: event_date, ts_col: event_time, hours: [0, 23], min_hours: 22}
+  - {id: bus_position_hour_coverage, kind: hour_coverage, severity: warning, action: alert, table: fact.bus_position, date_col: event_date, ts_col: event_time, hours: [5, 23], min_hours: 15}
+  - {id: bus_arrival_hour_coverage, kind: hour_coverage, severity: warning, action: alert, table: fact.bus_arrival, date_col: event_date, ts_col: event_time, hours: [5, 23], min_hours: 15}
+  - {id: traffic_volume_drift, kind: volume_drift, severity: warning, action: alert, table: fact.traffic_speed, date_col: event_date, baseline_days: 7, min_baseline_days: 3, low: 0.5, high: 2.0}
+  - {id: bus_position_volume_drift, kind: volume_drift, severity: warning, action: alert, table: fact.bus_position, date_col: event_date, baseline_days: 7, min_baseline_days: 3, low: 0.5, high: 2.0}
+  - {id: bus_arrival_volume_drift, kind: volume_drift, severity: warning, action: alert, table: fact.bus_arrival, date_col: event_date, baseline_days: 7, min_baseline_days: 3, low: 0.5, high: 2.0}
+  # ---------------------------------------------------------------- 참조 무결성
+  - {id: position_next_stop_in_arrival, kind: ref_integrity, severity: info, action: record, child_table: fact.bus_position, child_col: next_stop_id, parent_table: fact.bus_arrival, parent_col: station_id, date_col: event_date, max_orphan_rate: 0.2, min_rows: 50}
+  # ---------------------------------------------------------------- 마트 신뢰도 (expected_state: 기준선 28일 전에는 provisional 이 정상)
+  - {id: congestion_threshold_reliability, kind: mart_reliability, severity: info, action: record, mart_table: mart.v_congestion_threshold_latest, flag_col: provisional, source_table: fact.traffic_speed, source_date_col: event_date, mature_after_days: 28}
+  # ---------------------------------------------------------------- 적재·운영
+  - {id: gold_intraday_load_health, kind: load_health, severity: error, action: alert, dag_id: gold_intraday, max_age_hours: 3, stale_running_hours: 2}
+  - {id: gold_daily_load_health, kind: load_health, severity: error, action: alert, dag_id: gold_daily, max_age_hours: 30, stale_running_hours: 3}
+  - {id: collector_call_fail_rate, kind: call_fail_rate, severity: warning, action: alert, max_rate: 0.3, min_calls: 20}
+  - {id: incident_link_rate, kind: incident_link_rate, severity: info, action: record, min_rows: 5}
+  - {id: table_bloat, kind: table_bloat, severity: warning, action: alert, max_ratio: 0.2, min_live_rows: 10000}

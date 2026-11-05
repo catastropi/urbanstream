@@ -15,7 +15,7 @@ CORE = ("postgres", "kafka")
 
 def test_expected_services_and_profiles():
     assert set(SERVICES) == {"postgres", "kafka", "kafka-ui", "spark-bronze", "spark-silver", "spark-gold",
-                             "airflow-scheduler", "airflow-apiserver", "airflow-dag-processor"}
+                             "airflow-scheduler", "airflow-apiserver", "airflow-dag-processor", "monitor"}
     assert SERVICES["postgres"]["profiles"] == ["core"] and SERVICES["kafka"]["profiles"] == ["core"]
     assert SERVICES["kafka-ui"]["profiles"] == ["dev"]
     assert SERVICES["spark-bronze"]["profiles"] == ["streaming"]    # core 만 켜면 Spark 는 뜨지 않는다 (메모리)
@@ -47,6 +47,12 @@ def test_every_service_has_memory_limit_and_restart_policy():
     for name, svc in SERVICES.items():
         assert "mem_limit" in svc, f"{name}: mem_limit 이 없습니다 (Docker VM 메모리 보호)"
         assert svc.get("restart", "").startswith("on-failure")
+
+
+def test_restart_policy_has_no_retry_cap():
+    """Mac 훈련(D-142): on-failure:3 은 Kafka 가 돌아오기 전에 3번을 다 써서 spark-bronze 가 영구 정지했다. 횟수 제한(`:N`)을 두지 않는다."""
+    for name, svc in SERVICES.items():
+        assert svc.get("restart") == "on-failure", f"{name}: restart={svc.get('restart')!r} — 횟수 제한 없는 on-failure 여야 합니다"
 
 
 def test_core_services_have_healthchecks_and_ui_waits_for_kafka():
@@ -276,3 +282,24 @@ def test_airflow_dockerfile_pins_versions_and_uses_constraints():
     assert "default-jre-headless" in AF_DOCKERFILE
     pyspark_default = re.search(r"^ARG PYSPARK_VERSION=(\S+)$", AF_DOCKERFILE, re.M).group(1)
     assert pyspark_default == _default(SPARK["build"]["args"]["SPARK_VERSION"]), "Silver/Bronze 의 Spark 와 같은 버전이어야 합니다"
+
+
+def test_monitor_service_is_minimal_and_read_only():
+    m = SERVICES["monitor"]
+    assert m["profiles"] == ["monitor"] and m["image"].startswith("urbanstream/airflow:")
+    assert "env_file" not in m and not any("docker.sock" in str(v) for v in m.get("volumes", []))
+    assert "ports" not in m
+    for v in m["volumes"]:
+        assert v.endswith(":ro"), f"monitor 마운트는 읽기 전용이어야 합니다: {v}"
+    env = m["environment"]
+    for secret_like in ("SEOUL_API_KEY", "KMA_API_KEY", "POSTGRES_PASSWORD", "AIRFLOW__CORE__FERNET_KEY"):
+        assert secret_like not in env, f"monitor 에 {secret_like} 를 넣지 않습니다"
+    assert env["GOLD_WRITER_USER"] == "gold_loader" and env["KAFKA_BOOTSTRAP"] == "kafka:19092"
+    assert "healthcheck" in m and m["depends_on"]["kafka"]["condition"] == "service_healthy"
+
+
+def test_alert_webhook_url_is_referenced_by_name_only():
+    text = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    assert not re.search(r"https://(?:discord|hooks\.slack)", text), "웹훅 URL 을 compose 에 직접 쓰지 않습니다"
+    assert SERVICES["airflow-scheduler"]["environment"]["ALERT_WEBHOOK_URL"].startswith("${ALERT_WEBHOOK_URL")
+    assert SERVICES["monitor"]["environment"]["ALERT_WEBHOOK_URL"].startswith("${ALERT_WEBHOOK_URL")

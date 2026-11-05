@@ -7,7 +7,7 @@ from __future__ import annotations
 import pendulum
 from airflow.sdk import dag, task
 
-from batch import jobs, marts
+from batch import dq_jobs, jobs, marts
 
 DEFAULT_ARGS = {"owner": "urbanstream", "retries": 3, "retry_delay": pendulum.duration(minutes=20)}
 
@@ -32,7 +32,9 @@ def weather_traffic_analysis():
     @task(on_failure_callback=jobs.on_failure)
     def check_upstream(**ctx) -> int:
         d0, d1 = _window(ctx)
-        return marts.require_recent_load(d0, d1)
+        run_id = marts.require_recent_load(d0, d1)
+        dq_jobs.require_dq_ok("weather_traffic_analysis")          # 관찰 기간이 끝난 block_mart 규칙(시각 이상)이 fail 이면 여기서 멈춘다 — 지금은 사실상 통과
+        return run_id
 
     @task(on_failure_callback=jobs.on_failure, execution_timeout=pendulum.duration(minutes=30))
     def build(_upstream: int, **ctx) -> dict:

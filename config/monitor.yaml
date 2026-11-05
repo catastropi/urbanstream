@@ -1,0 +1,36 @@
+# 감시 루프(monitor) 설정 (Step 8, ADR-0010 D8-2/D8-8). 숫자는 [가정] 시작값 — 7일 뒤 ops.call_event 분포로 보정한다(D-121).
+version: 1
+tick_sec: 60                  # 감시 주기
+kafka:
+  topic: platform.audit
+  start_hours_back: 168       # 처음 켤 때 이만큼 거슬러 읽는다(토픽 보관 7일)
+  poll_timeout_sec: 2.0
+  max_messages_per_tick: 20000
+# 소스 신선도: 기대 호출 간격(sources.yaml 의 interval — 대상들이 거의 동시에 불리므로 나누지 않는다, D-140)의 배수
+freshness:
+  warn_factor: 2.5
+  down_factor: 5.0
+  fail_rate_degraded: 0.5     # 최근 1시간 호출 중 실패 비율이 이 이상이면 degraded
+  fail_rate_min_calls: 4      # 이 호출 수 미만이면 실패율을 보지 않는다
+  budget_degraded_ratio: 0.8
+# sources.yaml 로 계산한 간격을 덮어쓰는 값(초). 기상청은 같은 발표 시각이면 호출을 건너뛰어 실제 감사 기록이 시간당 1~2건이다.
+expected_gap_override_sec:
+  kma_ncst: 4500              # 정시 발표 + 15분 지연 + 여유
+# 레이어(Bronze/Silver) 정체: 원천 소스의 down 기준 + margin 안에 새 파일이 없으면 정체
+layers:
+  margin_sec: 600
+  bronze_root: /data/bronze
+  silver_root: /data/silver
+  # 표 이름 → 원천 소스 (표 이름은 data/bronze|silver 아래 폴더 이름)
+  bronze:
+    seoul_traffic: seoul_traffic
+    seoul_incident: seoul_incident
+    bus_position: bus_position
+    bus_arrival: bus_arrival
+    kma_ncst: kma_ncst
+  silver:
+    silver_traffic_speed: seoul_traffic
+    silver_incident_observation: seoul_incident
+    silver_bus_position: bus_position
+    silver_bus_arrival: bus_arrival
+    silver_weather: kma_ncst

@@ -9,6 +9,7 @@
 #   dev       : kafka-ui              (COMPOSE_PROFILES=core,dev)
 #   streaming : spark-bronze          (COMPOSE_PROFILES=core,streaming — scripts/stack.sh up-streaming)
 #   airflow   : airflow-scheduler/apiserver/dag-processor  (Step 7 — scripts/stack.sh up-airflow)
+#   monitor   : monitor (Step 8 — 감사 토픽 감시 + 알림. scripts/stack.sh up-monitor)
 #
 # 사용법은 docs/runbooks/step2-stack.md, 결정 근거는 docs/adr/0003-compose-infra.md.
 # 모든 포트는 127.0.0.1 에만 연다 (같은 와이파이의 다른 기기에서 접근 불가).
@@ -16,8 +17,10 @@
 
 name: urbanstream
 
+# 횟수 제한을 두지 않는다(D-142): Mac 훈련에서 Kafka 를 내렸다 올리자 spark-bronze 가 '브로커 이름을 못 찾음'으로 즉시 죽고, 3번 재시작이
+# 몇 초 안에 모두 실패해 그대로 멈췄다(약 8시간 적재 중단). 계속 재시도하면 Kafka 가 돌아온 뒤 저절로 회복한다. 코드 오류로 반복해 죽는 경우는 감시(monitor)가 알린다.
 x-restart: &restart
-  restart: on-failure:3
+  restart: on-failure
 
 # Step 7: Airflow 공통 설정. 결정 근거 docs/adr/0009-step7-airflow.md, 사용법 docs/runbooks/step7a-airflow.md
 # - env_file 을 쓰지 않는다: .env 전체(API 키 등)가 컨테이너에 들어가지 않게, 필요한 값만 아래에 적는다.
@@ -50,6 +53,10 @@ x-airflow-common: &airflow-common
     GOLD_SILVER_ROOT: /data/silver
     GOLD_BRONZE_ROOT: /data/bronze
     GOLD_STAGE_ROOT: /data/gold_stage
+    # 알림 (Step 8, ADR-0010). 웹훅 URL 은 비밀이다 — .env 에만 두고 여기에는 이름만 적는다. 비어 있으면 알림은 ops.alert_event 에만 기록된다.
+    ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+    ALERT_WEBHOOK_KIND: ${ALERT_WEBHOOK_KIND:-discord}
+    ALERTS_ENABLED: ${ALERTS_ENABLED:-true}
   volumes: &airflow-volumes
     - ./dags:/opt/airflow/dags:ro
     - ./batch:/opt/urbanstream/batch:ro
@@ -280,6 +287,50 @@ services:
       retries: 5
       start_period: 60s
     mem_limit: ${AIRFLOW_DAGPROC_MEM_LIMIT:-768m}
+
+  # Step 8: 감시 루프. Airflow 이미지(psycopg·confluent-kafka·pyyaml 포함)를 그대로 쓰고 아무것도 새로 빌드하지 않는다. 결정 근거 docs/adr/0010-step8-dq-monitoring.md
+  # - env_file·docker.sock 을 쓰지 않는다. 필요한 값만 아래에 적는다 (API 키·업무 DB 관리자 비밀번호는 들어가지 않는다).
+  # - 코드·설정·Bronze/Silver 는 모두 읽기 전용 마운트. 쓰는 곳은 Postgres 의 ops 표뿐이다.
+  # - 이미지는 airflow-scheduler 의 build 로 만든다 → scripts/stack.sh up-monitor 가 먼저 빌드한다 (Compose v2.10).
+  monitor:
+    <<: *restart
+    image: urbanstream/airflow:${AIRFLOW_VERSION:-3.3.0}
+    profiles: ["monitor"]
+    container_name: urbanstream-monitor
+    user: "50000:0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    entrypoint: ["python", "-m", "urbanstream.monitor"]
+    environment:
+      URBANSTREAM_ROOT: /opt/urbanstream
+      PYTHONPATH: /opt/urbanstream:/opt/urbanstream/src
+      TZ: Asia/Seoul
+      KAFKA_BOOTSTRAP: kafka:19092
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-urbanstream}
+      GOLD_WRITER_USER: gold_loader
+      GOLD_WRITER_PASSWORD: ${GOLD_LOADER_PASSWORD:?GOLD_LOADER_PASSWORD 가 .env 에 없습니다. scripts/stack.sh init-env 를 먼저 실행하세요}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+      ALERT_WEBHOOK_KIND: ${ALERT_WEBHOOK_KIND:-discord}
+      ALERTS_ENABLED: ${ALERTS_ENABLED:-true}
+    volumes:
+      - ./batch:/opt/urbanstream/batch:ro
+      - ./src:/opt/urbanstream/src:ro
+      - ./config:/opt/urbanstream/config:ro
+      - ./data/bronze:/data/bronze:ro
+      - ./data/silver:/data/silver:ro
+    healthcheck:
+      # 박동 파일이 5분 안에 갱신돼야 정상 (주기 60초). 루프가 멈추면 unhealthy 로 보인다.
+      test: ["CMD-SHELL", "python -c \"import os,sys,time; sys.exit(0 if time.time()-os.path.getmtime('/tmp/monitor.alive') < 300 else 1)\""]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    mem_limit: ${MONITOR_MEM_LIMIT:-256m}
 
 volumes:
   postgres-data:

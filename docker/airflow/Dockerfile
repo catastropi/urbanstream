@@ -21,4 +21,4 @@ USER airflow
 ENV JAVA_HOME=/opt/java-home
 RUN pip install --no-cache-dir \
       --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_MM}.txt" \
-      "psycopg[binary]>=3.2" "pyarrow>=15" pyyaml "pyspark==${PYSPARK_VERSION}"
+      "psycopg[binary]>=3.2" "pyarrow>=15" pyyaml confluent-kafka "pyspark==${PYSPARK_VERSION}"

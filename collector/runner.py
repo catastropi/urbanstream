@@ -9,6 +9,7 @@ import json
 import logging
 import random
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -269,9 +270,43 @@ class Scheduler:
         return max(0.0, min((d - now).total_seconds() for d in dues)) if dues else 3600.0
 
 
+class SleepWatcher:
+    """호스트 잠자기(맥 덮개 닫음) 감지. 벽시계가 흐른 시간과 단조시계가 흐른 시간의 차이가 임계 이상이면 그만큼 잤다고 본다.
+
+    macOS 의 time.monotonic() 은 잠자는 동안 멈춘다고 전제한다 `[추정]` — Mac 에서 scripts/sleep_probe.py 로 확인한다.
+    멈추지 않는 환경이면 차이가 0 으로 보여 감지하지 못한다(알림이 '잠자기 격하' 없이 원래 수준으로 나갈 뿐, 오탐은 없다).
+    시계는 주입할 수 있다(시험).
+    """
+
+    def __init__(self, wall: Callable[[], float] = time.time, mono: Callable[[], float] = time.monotonic,
+                 threshold_sec: float = 30.0) -> None:
+        self._wall, self._mono, self.threshold_sec = wall, mono, threshold_sec
+        self._w, self._m = wall(), mono()
+
+    def check(self) -> float:
+        """마지막 호출 이후 잠잔 시간(초). 임계 미만이면 0."""
+        w, m = self._wall(), self._mono()
+        slept = (w - self._w) - (m - self._m)
+        self._w, self._m = w, m
+        return slept if slept >= self.threshold_sec else 0.0
+
+
+def report_resume(collector: "Collector", watcher: SleepWatcher) -> float:
+    slept = watcher.check()
+    if slept:
+        log.warning("호스트가 약 %.0f초 잠들었다 깼습니다 — audit 에 host_resume 을 남깁니다", slept)
+        try:
+            collector._audit(event="host_resume", source_system="collector", slept_sec=round(slept, 1))
+        except Exception:                                                    # noqa: BLE001
+            log.exception("host_resume audit 실패")
+    return slept
+
+
 def run_forever(collector: Collector, scheduler: Scheduler, stop, clock: Callable[[], datetime]) -> None:
     """stop: threading.Event. 신호를 받으면 현재 사이클을 마치고 끝낸다."""
+    watcher = SleepWatcher()
     while not stop.is_set():
+        report_resume(collector, watcher)
         for target in scheduler.pop_ready(clock()):
             if stop.is_set():
                 break
@@ -315,8 +350,10 @@ def run_forever_parallel(collector: Collector, scheduler: Scheduler, stop, clock
                 in_flight.discard(target.key)
             wake.set()
 
+    watcher = SleepWatcher()
     try:
         while not stop.is_set():
+            report_resume(collector, watcher)
             with lock:
                 ready = [t for t in scheduler.pop_ready(clock()) if t.key not in in_flight]
                 in_flight.update(t.key for t in ready)

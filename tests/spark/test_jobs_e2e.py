@@ -29,7 +29,7 @@ def test_process_window_end_to_end_is_idempotent_and_cleans_up(spark, tmp_path, 
     def go(run_id, try_number=1):
         return J.process_window(
             D, D, dag_id="gold_intraday", run_id=run_id, try_number=try_number, refresh_mart=True, base=base,
-            load=lambda sd, refresh_mart=False: J.run_load(sd, refresh_mart=refresh_mart, connect=connect),
+            load=lambda sd, refresh_mart=False, dag_id=None: J.run_load(sd, refresh_mart=refresh_mart, connect=connect, dag_id=dag_id),
             verify=lambda m, a, b: J.verify_counts(m, a, b, connect=connect))
 
     first = go("scheduled__1")

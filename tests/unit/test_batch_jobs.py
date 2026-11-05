@@ -280,7 +280,7 @@ def test_process_window_order_and_cleanup(tmp_path):
         sd.mkdir(parents=True)
         return _manifest(d0, d1)
 
-    def load(sd, refresh_mart=False):
+    def load(sd, refresh_mart=False, dag_id=None):
         calls.append(f"load:{refresh_mart}")
         assert sd.exists()
         return {"run_id": 11}
@@ -302,7 +302,7 @@ def test_process_window_keeps_stage_dir_when_load_fails(tmp_path):
         sd.mkdir(parents=True)
         return _manifest(d0, d1)
 
-    def load(sd, refresh_mart=False):
+    def load(sd, refresh_mart=False, dag_id=None):
         raise RuntimeError("db down")
 
     with pytest.raises(RuntimeError):
@@ -316,7 +316,7 @@ def test_process_window_does_not_load_when_audit_missing(tmp_path):
     stage = lambda d0, d1, sd: (sd.mkdir(parents=True), _manifest(d0, d1, audit=False))[1]
     with pytest.raises(J.JobError, match="audit"):
         J.process_window(d, d, dag_id="a", run_id="b", base=tmp_path, stage=stage,
-                         load=lambda sd, refresh_mart=False: loaded.append(1), verify=lambda *a: {})
+                         load=lambda sd, refresh_mart=False, dag_id=None: loaded.append(1), verify=lambda *a: {})
     assert loaded == []
 
 
@@ -346,7 +346,7 @@ def test_on_failure_calls_notify_with_dedup_key_and_masked_exception(caplog):
 # ------------------------------------------------------------------ 가볍게 import 되는가
 
 def test_jobs_module_does_not_import_heavy_dependencies():
-    code = ("import sys; sys.path[:0] = [%r, %r]; import batch.jobs, batch.marts, urbanstream.notify; "
+    code = ("import sys; sys.path[:0] = [%r, %r]; import batch.jobs, batch.marts, batch.dq_jobs, urbanstream.notify, urbanstream.dq.rules, urbanstream.dq.engine, urbanstream.monitor.config; "
             "bad = [m for m in ('pyspark', 'psycopg', 'pyarrow', 'airflow') if m in sys.modules]; "
             "sys.exit(1 if bad else 0)") % (str(ROOT), str(ROOT / "src"))
     r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)

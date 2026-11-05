@@ -7,6 +7,7 @@
 #   scripts/stack.sh up-streaming  위 + spark-bronze (이미지를 만들고 Kafka → Bronze 쓰기 시작. 첫 빌드는 몇 분 걸린다)
 #   scripts/stack.sh up-silver  위 + spark-bronze + spark-silver (Bronze → Silver. 메모리가 약 1.5 GiB 더 든다)
 #   scripts/stack.sh up-airflow 위 + Airflow 3개(scheduler/apiserver/dag-processor). DB 역할 준비 후 켠다 (http://127.0.0.1:8080)
+#   scripts/stack.sh up-monitor 감시 루프(monitor) 기동 — Kafka 감사 토픽·Bronze/Silver 를 감시하고 웹훅으로 알린다 (Airflow 이미지 사용)
 #   scripts/stack.sh check      상태/PostGIS/Kafka 왕복 점검
 #   scripts/stack.sh stats      컨테이너별 메모리·CPU 와 Docker VM 총 메모리 (data/stack/ 에 저장)
 #   scripts/stack.sh ps | logs [서비스]
@@ -69,6 +70,17 @@ case "$cmd" in
     COMPOSE_PROFILES="core,airflow" docker compose build airflow-scheduler
     COMPOSE_PROFILES="core,airflow" docker compose up -d --wait
     COMPOSE_PROFILES="core,airflow" docker compose ps
+    ;;
+  up-monitor)
+    need_docker
+    mkdir -p data/bronze data/silver
+    COMPOSE_PROFILES="core" docker compose up -d --wait
+    "$PY" scripts/migrate.py
+    "$PY" scripts/db_bootstrap.py
+    # monitor 는 Airflow 이미지를 쓴다. 이미지는 airflow-scheduler 에만 build 가 있으므로 먼저 따로 빌드한다 (up-airflow 와 같은 이유).
+    COMPOSE_PROFILES="core,airflow" docker compose build airflow-scheduler
+    COMPOSE_PROFILES="core,monitor" docker compose up -d --wait
+    COMPOSE_PROFILES="core,monitor" docker compose ps
     ;;
   ps)
     need_docker

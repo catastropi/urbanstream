@@ -9,3 +9,7 @@ gold_daily, incident_impact_finalize, weather_traffic_analysis, dq_report_daily,
 backfill, replay_failed, warehouse_maintenance, platform_supervisor
 
 Blueprint 참고: M절(Airflow DAG)
+
+## 구현 상태 (2026-11-05, 11개)
+gold_intraday(:20) · gold_daily(01:00) · backfill(수동) · bus_delay(02:00) · baseline_build(일 02:30) · incident_impact_finalize(03:00) · weather_traffic_analysis(03:30) · warehouse_maintenance(일 04:00) · **silver_reconcile_daily(04:30, pool gold_io)** · **dq_report_daily(05:00)** · **anomaly_scan(:35)**.
+아직 없음: reference_data_sync(D-101), replay_failed, platform_supervisor(→ `monitor` 컨테이너로 대체, ADR-0010). `silver_reconcile_hourly` 는 일 단위(`silver_reconcile_daily`)로 바꿨다(Spark 비용).

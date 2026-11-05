@@ -83,12 +83,13 @@ def load_table(conn, spec: TableSpec, stage: Path) -> int:
     return len(rows)
 
 
-def load_all(conn, stage: Path, refresh_mart: bool = False, specs: tuple[TableSpec, ...] = SPECS) -> dict:
+def load_all(conn, stage: Path, refresh_mart: bool = False, specs: tuple[TableSpec, ...] = SPECS, dag_id: str | None = None) -> dict:
+    """dag_id: 적재를 부른 DAG 이름 (ops.load_run.dag_id, D-107). job 은 계속 'gold_load' 다 — 마트 선행조건이 job 으로 거른다."""
     manifest = json.loads((stage / "manifest.json").read_text(encoding="utf-8"))
     d0 = date.fromisoformat(manifest["date_from"]) if manifest.get("date_from") else date(1970, 1, 1)
     d1 = date.fromisoformat(manifest["date_to"]) if manifest.get("date_to") else date(2999, 12, 31)
-    run_id = conn.execute("INSERT INTO ops.load_run (job, date_from, date_to) VALUES ('gold_load', %s, %s) RETURNING run_id",
-                          (d0, d1)).fetchone()[0]
+    run_id = conn.execute("INSERT INTO ops.load_run (job, date_from, date_to, dag_id) VALUES ('gold_load', %s, %s, %s) RETURNING run_id",
+                          (d0, d1, dag_id)).fetchone()[0]
     counts: dict[str, int] = {}
     try:
         for s in specs:

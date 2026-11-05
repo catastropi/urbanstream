@@ -8,7 +8,7 @@ from __future__ import annotations
 import pendulum
 from airflow.sdk import dag, task
 
-from batch import jobs, marts
+from batch import dq_jobs, jobs, marts
 
 DEFAULT_ARGS = {"owner": "urbanstream", "retries": 3, "retry_delay": pendulum.duration(minutes=20)}
 
@@ -29,7 +29,9 @@ def incident_impact_finalize():
     def check_upstream(**ctx) -> int:
         anchor = jobs.pick_anchor(ctx.get("data_interval_end"), ctx.get("logical_date"), getattr(ctx.get("dag_run"), "run_after", None))
         d0, d1 = jobs.window_daily(anchor)
-        return marts.require_recent_load(d0, d1)
+        run_id = marts.require_recent_load(d0, d1)
+        dq_jobs.require_dq_ok("incident_impact_finalize")          # 관찰 기간이 끝난 block_mart 규칙(시각 이상)이 fail 이면 여기서 멈춘다 — 지금은 사실상 통과
+        return run_id
 
     @task(on_failure_callback=jobs.on_failure, execution_timeout=pendulum.duration(minutes=30))
     def finalize(_upstream: int) -> dict:
