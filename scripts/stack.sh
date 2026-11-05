@@ -7,6 +7,7 @@
 #   scripts/stack.sh up-streaming  위 + spark-bronze (이미지를 만들고 Kafka → Bronze 쓰기 시작. 첫 빌드는 몇 분 걸린다)
 #   scripts/stack.sh up-silver  위 + spark-bronze + spark-silver (Bronze → Silver. 메모리가 약 1.5 GiB 더 든다)
 #   scripts/stack.sh up-airflow 위 + Airflow 3개(scheduler/apiserver/dag-processor). DB 역할 준비 후 켠다 (http://127.0.0.1:8080)
+#   scripts/stack.sh up-api     읽기 전용 API 기동 (http://127.0.0.1:8010/docs). .env 에 API_KEYS·API_DB_PASSWORD 가 있어야 한다 (init-env)
 #   scripts/stack.sh up-monitor 감시 루프(monitor) 기동 — Kafka 감사 토픽·Bronze/Silver 를 감시하고 웹훅으로 알린다 (Airflow 이미지 사용)
 #   scripts/stack.sh check      상태/PostGIS/Kafka 왕복 점검
 #   scripts/stack.sh stats      컨테이너별 메모리·CPU 와 Docker VM 총 메모리 (data/stack/ 에 저장)
@@ -81,6 +82,20 @@ case "$cmd" in
     COMPOSE_PROFILES="core,airflow" docker compose build airflow-scheduler
     COMPOSE_PROFILES="core,monitor" docker compose up -d --wait
     COMPOSE_PROFILES="core,monitor" docker compose ps
+    ;;
+  up-api)
+    need_docker
+    # 키·비밀번호가 비어 있으면 API 가 기동을 거부한다 → 컨테이너를 띄우기 전에 알려 준다
+    if ! grep -Eq '^API_KEYS=.{24,}' .env 2>/dev/null || ! grep -Eq '^API_DB_PASSWORD=.{16,}' .env 2>/dev/null; then
+      echo ".env 에 API_KEYS / API_DB_PASSWORD 가 없습니다. 먼저 실행: scripts/stack.sh init-env"
+      exit 1
+    fi
+    COMPOSE_PROFILES="core" docker compose up -d --wait
+    "$PY" scripts/migrate.py
+    # 013 이 만든 api_service 역할에 비밀번호·LOGIN 을 설정한다 (--api 는 이 일만 한다)
+    "$PY" scripts/db_bootstrap.py --api
+    COMPOSE_PROFILES="core,api" docker compose up -d --build --wait
+    COMPOSE_PROFILES="core,api" docker compose ps
     ;;
   ps)
     need_docker

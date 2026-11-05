@@ -48,6 +48,8 @@ GENERATORS: dict[str, Callable[[], str]] = {
     "AIRFLOW_FERNET_KEY": _gen_fernet_key,
     "AIRFLOW_JWT_SECRET": _gen_secret,
     "AIRFLOW_ADMIN_PASSWORD": _gen_password,
+    "API_DB_PASSWORD": _gen_password,
+    "API_KEYS": _gen_secret,        # 43자. 쉼표가 없는 urlsafe 문자열이라 목록 구분자와 겹치지 않는다
 }
 
 

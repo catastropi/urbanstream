@@ -11,13 +11,16 @@
   - `0005-bronze-spark.md` — Step 4 Bronze: Spark 버전·이미지, Parquet, 메모리 구성, 쓰기 방식 (+ 정정 1: 실측 반영)
   - `0006-step5-pre-decisions.md` — Step 5 시작 전 결정: Silver 입력, Delta 보류, 과거 구간, 돌발 처리
   - `0007-silver-rules.md` — Silver 규칙: 워터마크, 0값/결측, 장기 돌발(7일), 기상 긴 형태 (5-0 실측 근거)
+  - `0008-gold-postgres.md` · `0009-step7-airflow.md` · `0010-step8-dq-monitoring.md` — Gold(Postgres) / Airflow·마트 / DQ·모니터링·알림
+  - `0011-step9-api.md` — Step 9 FastAPI: 로그인 역할(013), 인증, 응답 봉투(as_of/stale), 페이지네이션·기간, 오류 형식, 캐시·속도 제한, 컨테이너, 성능 결정, 엔드포인트↔원천 표
 - `runbooks/` — 절차서.
   - `step0-closeout.md` — Step 0 마무리 측정·확인 (사용자가 Mac 에서 실행)
   - `step2-stack.md` — Docker 스택 기동·점검·메모리 측정 (사용자가 Mac 에서 실행)
   - `step3-collector.md` — 토픽 만들기와 Collector 첫 실행·운영 (사용자가 Mac 에서 실행)
   - `step4-bronze.md` — Bronze(Spark) 첫 실행·검증·복구 (사용자가 Mac 에서 실행)
   - `step5-silver.md` — Silver 준비: 5-0 Bronze 프로파일링 (진행 중)
-  - 장애 대응 런북(Blueprint U절)은 Collector 이후에 작성.
+  - `step6-gold.md` · `step7a-airflow.md` · `step7b-marts.md` · `step7c-marts.md` · `step8-recovery.md` — Gold / Airflow / 마트 / 복구 훈련
+  - `step9-api.md` — API 기동·점검(curl)·오류 코드·테스트·키 교체 (사용자가 Mac 에서 실행)
 
 전체 설계는 이 저장소 밖(대화 세션)에서 만든 Architecture Blueprint 문서가 기준이며,
 이 폴더는 그 설계가 실제 구현·관측과 만나면서 구체화되는 기록을 쌓는 곳이다.

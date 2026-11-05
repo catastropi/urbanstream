@@ -1,0 +1,4377 @@
+{
+  "components": {
+    "schemas": {
+      "AlertRecent": {
+        "properties": {
+          "alert_id": {
+            "title": "Alert Id",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "dedup_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dedup Key"
+          },
+          "level": {
+            "enum": [
+              "info",
+              "warning",
+              "error",
+              "critical"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "sent",
+              "digest",
+              "digested",
+              "suppressed",
+              "failed",
+              "dropped"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "alert_id",
+          "created_at",
+          "level",
+          "title",
+          "status"
+        ],
+        "title": "AlertRecent",
+        "type": "object"
+      },
+      "Anomaly": {
+        "properties": {
+          "baseline_iqr": {
+            "title": "Baseline Iqr",
+            "type": "number"
+          },
+          "baseline_p50": {
+            "title": "Baseline P50",
+            "type": "number"
+          },
+          "detected_at": {
+            "format": "date-time",
+            "title": "Detected At",
+            "type": "string"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "enum": [
+                  "slow",
+                  "fast"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "event_time": {
+            "format": "date-time",
+            "title": "Event Time",
+            "type": "string"
+          },
+          "link_id": {
+            "title": "Link Id",
+            "type": "string"
+          },
+          "n_obs": {
+            "title": "N Obs",
+            "type": "integer"
+          },
+          "provisional": {
+            "title": "Provisional",
+            "type": "boolean"
+          },
+          "robust_z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Robust Z"
+          },
+          "speed_kmh": {
+            "title": "Speed Kmh",
+            "type": "number"
+          },
+          "status": {
+            "description": "anomaly=기준선이 충분(28일 이상, 표본 20 이상)할 때의 이탈 / candidate=기준선이 잠정이거나 표본이 적을 때의 이탈 / degenerate_baseline=IQR 이 0이라 z 계산 불가",
+            "enum": [
+              "anomaly",
+              "candidate",
+              "degenerate_baseline"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "link_id",
+          "event_time",
+          "speed_kmh",
+          "baseline_p50",
+          "baseline_iqr",
+          "status",
+          "n_obs",
+          "provisional",
+          "detected_at"
+        ],
+        "title": "Anomaly",
+        "type": "object"
+      },
+      "ArrivalDrift": {
+        "properties": {
+          "drift_p50_sec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "마지막 예측 − 처음 예측(초). 양수 = 처음 예측보다 늦게 도착하는 쪽으로 밀림. 시간표 대비 지연이 아니다",
+            "title": "Drift P50 Sec"
+          },
+          "drift_p90_sec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drift P90 Sec"
+          },
+          "event_date": {
+            "format": "date",
+            "title": "Event Date",
+            "type": "string"
+          },
+          "kst_hour": {
+            "title": "Kst Hour",
+            "type": "integer"
+          },
+          "n_approaches": {
+            "title": "N Approaches",
+            "type": "integer"
+          },
+          "provisional": {
+            "description": "접근 횟수가 10 미만",
+            "title": "Provisional",
+            "type": "boolean"
+          },
+          "route_id": {
+            "title": "Route Id",
+            "type": "string"
+          },
+          "station_id": {
+            "title": "Station Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "route_id",
+          "station_id",
+          "event_date",
+          "kst_hour",
+          "n_approaches",
+          "provisional"
+        ],
+        "title": "ArrivalDrift",
+        "type": "object"
+      },
+      "BusPosition": {
+        "properties": {
+          "congestion": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Congestion"
+          },
+          "dq_flags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dq Flags",
+            "type": "array"
+          },
+          "event_time": {
+            "format": "date-time",
+            "title": "Event Time",
+            "type": "string"
+          },
+          "full_sect_dist": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Sect Dist"
+          },
+          "is_full": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Full"
+          },
+          "is_last": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Last"
+          },
+          "is_running": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Running"
+          },
+          "last_stop_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Stop Id"
+          },
+          "lat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lat"
+          },
+          "lon": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lon"
+          },
+          "next_stop_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Stop Id"
+          },
+          "plain_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plain No"
+          },
+          "sect_dist": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sect Dist"
+          },
+          "sect_ord": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sect Ord"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Id"
+          },
+          "stop_flag": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Flag"
+          },
+          "veh_id": {
+            "title": "Veh Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "veh_id",
+          "event_time"
+        ],
+        "title": "BusPosition",
+        "type": "object"
+      },
+      "Congestion": {
+        "properties": {
+          "baseline_p50": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseline P50"
+          },
+          "baseline_provisional": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseline Provisional"
+          },
+          "day_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "weekday",
+                  "sat",
+                  "sun",
+                  "holiday"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Type"
+          },
+          "event_time": {
+            "format": "date-time",
+            "title": "Event Time",
+            "type": "string"
+          },
+          "kst_hour": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kst Hour"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "enum": [
+                  "severe",
+                  "heavy",
+                  "slow",
+                  "normal"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "표본이 부족하면 null(계산하지 않음). p10 이하 severe, p25 이하 heavy, p50 이하 slow, 그 위 normal",
+            "title": "Level"
+          },
+          "link_id": {
+            "title": "Link Id",
+            "type": "string"
+          },
+          "ratio_to_baseline": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "현재 속도 / 같은 요일·시각 기준선 중앙값. 1 = 평소와 같음, 작을수록 느림",
+            "title": "Ratio To Baseline"
+          },
+          "speed_kmh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speed Kmh"
+          },
+          "threshold_n_obs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold N Obs"
+          },
+          "threshold_provisional": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold Provisional"
+          },
+          "threshold_version": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold Version"
+          }
+        },
+        "required": [
+          "link_id",
+          "event_time"
+        ],
+        "title": "Congestion",
+        "type": "object"
+      },
+      "DataGap": {
+        "properties": {
+          "duration_sec": {
+            "title": "Duration Sec",
+            "type": "integer"
+          },
+          "gap_end": {
+            "format": "date-time",
+            "title": "Gap End",
+            "type": "string"
+          },
+          "gap_id": {
+            "title": "Gap Id",
+            "type": "integer"
+          },
+          "gap_start": {
+            "format": "date-time",
+            "title": "Gap Start",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "host_stall",
+              "collector_blackout"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "recoverable": {
+            "title": "Recoverable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "gap_id",
+          "kind",
+          "gap_start",
+          "gap_end",
+          "duration_sec",
+          "recoverable"
+        ],
+        "title": "DataGap",
+        "type": "object"
+      },
+      "DqLatest": {
+        "properties": {
+          "action": {
+            "enum": [
+              "record",
+              "alert",
+              "block_mart"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "checked_at": {
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "include=detail 일 때만 채워진다",
+            "title": "Detail"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "n_checked": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Checked"
+          },
+          "rule_id": {
+            "title": "Rule Id",
+            "type": "string"
+          },
+          "run_date": {
+            "format": "date",
+            "title": "Run Date",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning",
+              "error"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "shadow": {
+            "description": "true 면 관찰 기간이라 알림·마트 차단에 쓰이지 않는다",
+            "title": "Shadow",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "warn",
+              "fail",
+              "unknown",
+              "skipped"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "rule_id",
+          "kind",
+          "target",
+          "severity",
+          "action",
+          "status",
+          "shadow",
+          "run_date",
+          "checked_at"
+        ],
+        "title": "DqLatest",
+        "type": "object"
+      },
+      "DqSummary": {
+        "properties": {
+          "checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "n_checks": {
+            "title": "N Checks",
+            "type": "integer"
+          },
+          "n_fail": {
+            "title": "N Fail",
+            "type": "integer"
+          },
+          "n_fail_error": {
+            "description": "관찰(shadow) 기간이 아닌 error 수준 규칙의 fail 수",
+            "title": "N Fail Error",
+            "type": "integer"
+          },
+          "n_pass": {
+            "title": "N Pass",
+            "type": "integer"
+          },
+          "n_unknown": {
+            "title": "N Unknown",
+            "type": "integer"
+          },
+          "n_warn": {
+            "title": "N Warn",
+            "type": "integer"
+          },
+          "run_date": {
+            "format": "date",
+            "title": "Run Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_date",
+          "n_checks",
+          "n_pass",
+          "n_warn",
+          "n_fail",
+          "n_unknown",
+          "n_fail_error"
+        ],
+        "title": "DqSummary",
+        "type": "object"
+      },
+      "Envelope_Link_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Link"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[Link]",
+        "type": "object"
+      },
+      "Envelope_List_AlertRecent__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/AlertRecent"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[List[AlertRecent]]",
+        "type": "object"
+      },
+      "Envelope_List_DataGap__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/DataGap"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[List[DataGap]]",
+        "type": "object"
+      },
+      "Envelope_List_DqLatest__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/DqLatest"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[List[DqLatest]]",
+        "type": "object"
+      },
+      "Envelope_List_DqSummary__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/DqSummary"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[List[DqSummary]]",
+        "type": "object"
+      },
+      "Envelope_List_ImpactByType__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactByType"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[List[ImpactByType]]",
+        "type": "object"
+      },
+      "Envelope_List_IncidentEpisode__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/IncidentEpisode"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[List[IncidentEpisode]]",
+        "type": "object"
+      },
+      "Envelope_List_LayerStatus__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/LayerStatus"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[List[LayerStatus]]",
+        "type": "object"
+      },
+      "Envelope_List_LoadRun__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/LoadRun"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[List[LoadRun]]",
+        "type": "object"
+      },
+      "Envelope_List_MartFreshness__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/MartFreshness"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[List[MartFreshness]]",
+        "type": "object"
+      },
+      "Envelope_List_SourceStatus__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/SourceStatus"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[List[SourceStatus]]",
+        "type": "object"
+      },
+      "Envelope_List_Threshold__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/Threshold"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[List[Threshold]]",
+        "type": "object"
+      },
+      "Envelope_List_WeatherEffect__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/WeatherEffect"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[List[WeatherEffect]]",
+        "type": "object"
+      },
+      "Envelope_PipelineHealth_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PipelineHealth"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[PipelineHealth]",
+        "type": "object"
+      },
+      "Envelope_list_BusPosition__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/BusPosition"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[list[BusPosition]]",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HealthOut": {
+        "properties": {
+          "status": {
+            "const": "ok",
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "version"
+        ],
+        "title": "HealthOut",
+        "type": "object"
+      },
+      "ImpactByType": {
+        "properties": {
+          "acc_type": {
+            "title": "Acc Type",
+            "type": "string"
+          },
+          "delta_p50": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta P50"
+          },
+          "n_episodes": {
+            "title": "N Episodes",
+            "type": "integer"
+          },
+          "n_linked": {
+            "title": "N Linked",
+            "type": "integer"
+          },
+          "n_sufficient": {
+            "title": "N Sufficient",
+            "type": "integer"
+          },
+          "provisional": {
+            "title": "Provisional",
+            "type": "boolean"
+          },
+          "ratio_in_p50": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ratio In P50"
+          }
+        },
+        "required": [
+          "acc_type",
+          "n_episodes",
+          "n_linked",
+          "n_sufficient",
+          "provisional"
+        ],
+        "title": "ImpactByType",
+        "type": "object"
+      },
+      "IncidentEpisode": {
+        "properties": {
+          "absent_since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "해제 시각이 아니라 '목록에서 처음 안 보인 시각'이다(근사)",
+            "title": "Absent Since"
+          },
+          "acc_id": {
+            "title": "Acc Id",
+            "type": "string"
+          },
+          "acc_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acc Type"
+          },
+          "expected_clear_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Clear At"
+          },
+          "first_seen_at": {
+            "format": "date-time",
+            "title": "First Seen At",
+            "type": "string"
+          },
+          "is_long_term": {
+            "title": "Is Long Term",
+            "type": "boolean"
+          },
+          "last_seen_at": {
+            "format": "date-time",
+            "title": "Last Seen At",
+            "type": "string"
+          },
+          "lat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lat"
+          },
+          "link_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link Id"
+          },
+          "lon": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lon"
+          },
+          "obs_count": {
+            "title": "Obs Count",
+            "type": "integer"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "still_listed": {
+            "title": "Still Listed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "acc_id",
+          "occurred_at",
+          "first_seen_at",
+          "last_seen_at",
+          "obs_count",
+          "is_long_term",
+          "still_listed"
+        ],
+        "title": "IncidentEpisode",
+        "type": "object"
+      },
+      "IncidentImpact": {
+        "properties": {
+          "delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta"
+          },
+          "distance_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance M"
+          },
+          "duration_min": {
+            "title": "Duration Min",
+            "type": "integer"
+          },
+          "finalized_at": {
+            "format": "date-time",
+            "title": "Finalized At",
+            "type": "string"
+          },
+          "link_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link Id"
+          },
+          "match_kind": {
+            "enum": [
+              "link_id",
+              "distance",
+              "no_link"
+            ],
+            "title": "Match Kind",
+            "type": "string"
+          },
+          "n_in": {
+            "title": "N In",
+            "type": "integer"
+          },
+          "n_pre": {
+            "title": "N Pre",
+            "type": "integer"
+          },
+          "provisional": {
+            "title": "Provisional",
+            "type": "boolean"
+          },
+          "ratio_in": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "돌발 구간 속도 / 평소(기준선) 중앙값. 1 = 평소와 같음, 작을수록 느림",
+            "title": "Ratio In"
+          },
+          "ratio_pre": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ratio Pre"
+          },
+          "sufficient": {
+            "title": "Sufficient",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "duration_min",
+          "match_kind",
+          "n_in",
+          "n_pre",
+          "sufficient",
+          "provisional",
+          "finalized_at"
+        ],
+        "title": "IncidentImpact",
+        "type": "object"
+      },
+      "IncidentImpactItem": {
+        "properties": {
+          "episode": {
+            "$ref": "#/components/schemas/IncidentEpisode"
+          },
+          "impact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IncidentImpact"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "description": "listed=아직 목록에 있음 / pending=해제됐지만 24시간 확정 전 / finalized=영향 계산 완료 / excluded_long_term=장기 공사라 영향으로 읽지 않음",
+            "enum": [
+              "listed",
+              "pending",
+              "finalized",
+              "excluded_long_term"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "episode"
+        ],
+        "title": "IncidentImpactItem",
+        "type": "object"
+      },
+      "LayerStatus": {
+        "properties": {
+          "age_sec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Sec"
+          },
+          "checked_at": {
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "last_write_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Write At"
+          },
+          "layer": {
+            "enum": [
+              "bronze",
+              "silver"
+            ],
+            "title": "Layer",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "source_system": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source System"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "degraded",
+              "down",
+              "idle",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "table_name": {
+            "title": "Table Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer",
+          "table_name",
+          "status",
+          "checked_at"
+        ],
+        "title": "LayerStatus",
+        "type": "object"
+      },
+      "Link": {
+        "properties": {
+          "geometry": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "GeoJSON LineString (WGS84). geometry=true 일 때만",
+            "title": "Geometry"
+          },
+          "is_collected": {
+            "title": "Is Collected",
+            "type": "boolean"
+          },
+          "length_m": {
+            "title": "Length M",
+            "type": "number"
+          },
+          "link_id": {
+            "title": "Link Id",
+            "type": "string"
+          },
+          "source_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Note"
+          },
+          "vertex_count": {
+            "title": "Vertex Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "link_id",
+          "length_m",
+          "vertex_count",
+          "is_collected"
+        ],
+        "title": "Link",
+        "type": "object"
+      },
+      "LoadRun": {
+        "properties": {
+          "dag_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dag Id"
+          },
+          "date_from": {
+            "format": "date",
+            "title": "Date From",
+            "type": "string"
+          },
+          "date_to": {
+            "format": "date",
+            "title": "Date To",
+            "type": "string"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "job": {
+            "title": "Job",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "integer"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "ok",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "job",
+          "date_from",
+          "date_to",
+          "started_at",
+          "status"
+        ],
+        "title": "LoadRun",
+        "type": "object"
+      },
+      "MartFreshness": {
+        "properties": {
+          "age_sec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Sec"
+          },
+          "last_computed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Computed At"
+          },
+          "mart": {
+            "title": "Mart",
+            "type": "string"
+          },
+          "max_age_hours": {
+            "title": "Max Age Hours",
+            "type": "number"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "degraded",
+              "down",
+              "idle",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mart",
+          "max_age_hours",
+          "status"
+        ],
+        "title": "MartFreshness",
+        "type": "object"
+      },
+      "Meta": {
+        "properties": {
+          "age_sec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "as_of 부터 응답을 만든 시각까지의 초. as_of 가 없으면 null",
+            "title": "Age Sec"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "이 응답이 대표하는 데이터의 시각. '현재' 엔드포인트는 전체 최신 관측, 기간 조회는 해당 소스의 최신 시각, 마트는 마지막 계산 시각. 데이터가 없으면 null",
+            "title": "As Of"
+          },
+          "loaded_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Gold 적재(gold_load)가 마지막으로 성공한 시각. 'current' 값은 이 적재 기준이라 실시간이 아니다(매시 20분 적재, 최대 약 80분 지연)",
+            "title": "Loaded At"
+          },
+          "notes": {
+            "description": "해석 주의 코드. 예: baseline_provisional, empty_result, outside_collection_window",
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "stale": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "age_sec 가 기준(기본 3시간, 운영 스냅샷은 5분)을 넘으면 true. 기준이 적용되지 않는 엔드포인트는 null",
+            "title": "Stale"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "필터 후 전체 행 수(top 적용 전). 해당 없으면 null",
+            "title": "Total"
+          }
+        },
+        "title": "Meta",
+        "type": "object"
+      },
+      "PageInfo": {
+        "properties": {
+          "has_more": {
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "limit",
+          "has_more"
+        ],
+        "title": "PageInfo",
+        "type": "object"
+      },
+      "PagedEnvelope_Anomaly_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/Anomaly"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageInfo"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "page"
+        ],
+        "title": "PagedEnvelope[Anomaly]",
+        "type": "object"
+      },
+      "PagedEnvelope_ArrivalDrift_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ArrivalDrift"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageInfo"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "page"
+        ],
+        "title": "PagedEnvelope[ArrivalDrift]",
+        "type": "object"
+      },
+      "PagedEnvelope_Congestion_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/Congestion"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageInfo"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "page"
+        ],
+        "title": "PagedEnvelope[Congestion]",
+        "type": "object"
+      },
+      "PagedEnvelope_IncidentImpactItem_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/IncidentImpactItem"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageInfo"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "page"
+        ],
+        "title": "PagedEnvelope[IncidentImpactItem]",
+        "type": "object"
+      },
+      "PagedEnvelope_Link_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/Link"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageInfo"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "page"
+        ],
+        "title": "PagedEnvelope[Link]",
+        "type": "object"
+      },
+      "PagedEnvelope_SectionSlowness_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/SectionSlowness"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageInfo"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "page"
+        ],
+        "title": "PagedEnvelope[SectionSlowness]",
+        "type": "object"
+      },
+      "PagedEnvelope_SpeedPoint_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/SpeedPoint"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageInfo"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "page"
+        ],
+        "title": "PagedEnvelope[SpeedPoint]",
+        "type": "object"
+      },
+      "PagedEnvelope_WeatherObs_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/WeatherObs"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageInfo"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "page"
+        ],
+        "title": "PagedEnvelope[WeatherObs]",
+        "type": "object"
+      },
+      "PipelineComponent": {
+        "properties": {
+          "age_sec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Sec"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "component": {
+            "title": "Component",
+            "type": "string"
+          },
+          "component_kind": {
+            "enum": [
+              "source",
+              "layer",
+              "monitor",
+              "load",
+              "mart"
+            ],
+            "title": "Component Kind",
+            "type": "string"
+          },
+          "last_ok_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Ok At"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "degraded",
+              "down",
+              "idle",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "component_kind",
+          "component",
+          "status"
+        ],
+        "title": "PipelineComponent",
+        "type": "object"
+      },
+      "PipelineHealth": {
+        "properties": {
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineComponent"
+            },
+            "title": "Components",
+            "type": "array"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "overall": {
+            "description": "가장 나쁜 상태. down > degraded > unknown > ok. idle(수집 창 밖)은 무시. 구성요소가 없으면 unknown",
+            "enum": [
+              "ok",
+              "degraded",
+              "down",
+              "idle",
+              "unknown"
+            ],
+            "title": "Overall",
+            "type": "string"
+          }
+        },
+        "required": [
+          "overall",
+          "counts",
+          "components"
+        ],
+        "title": "PipelineHealth",
+        "type": "object"
+      },
+      "ReadyOut": {
+        "properties": {
+          "db": {
+            "const": "ok",
+            "title": "Db",
+            "type": "string"
+          },
+          "status": {
+            "const": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "db"
+        ],
+        "title": "ReadyOut",
+        "type": "object"
+      },
+      "SectionSlowness": {
+        "properties": {
+          "base_n_obs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base N Obs"
+          },
+          "base_p50_sec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base P50 Sec"
+          },
+          "base_provisional": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Provisional"
+          },
+          "day_type": {
+            "enum": [
+              "weekday",
+              "sat",
+              "sun",
+              "holiday"
+            ],
+            "title": "Day Type",
+            "type": "string"
+          },
+          "entered_at": {
+            "format": "date-time",
+            "title": "Entered At",
+            "type": "string"
+          },
+          "event_date": {
+            "format": "date",
+            "title": "Event Date",
+            "type": "string"
+          },
+          "kst_hour": {
+            "title": "Kst Hour",
+            "type": "integer"
+          },
+          "ratio_to_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "통과 시간 / 평소 중앙값. 평소 표본이 10건 미만이면 null. 관측 주기(약 90초) 때문에 ±90초 오차",
+            "title": "Ratio To Base"
+          },
+          "route_id": {
+            "title": "Route Id",
+            "type": "string"
+          },
+          "sect_ord": {
+            "title": "Sect Ord",
+            "type": "integer"
+          },
+          "section_id": {
+            "title": "Section Id",
+            "type": "string"
+          },
+          "traversal_sec": {
+            "title": "Traversal Sec",
+            "type": "integer"
+          },
+          "veh_id": {
+            "title": "Veh Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "route_id",
+          "veh_id",
+          "section_id",
+          "sect_ord",
+          "entered_at",
+          "traversal_sec",
+          "event_date",
+          "kst_hour",
+          "day_type"
+        ],
+        "title": "SectionSlowness",
+        "type": "object"
+      },
+      "SourceStatus": {
+        "properties": {
+          "age_sec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Sec"
+          },
+          "budget_limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Limit"
+          },
+          "budget_used": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Used"
+          },
+          "calls_1h": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calls 1H"
+          },
+          "checked_at": {
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "expected_gap_sec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Gap Sec"
+          },
+          "fail_1h": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fail 1H"
+          },
+          "last_call_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Call At"
+          },
+          "last_ok_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Ok At"
+          },
+          "p95_latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95 Latency Ms"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "source_system": {
+            "title": "Source System",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "degraded",
+              "down",
+              "idle",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_system",
+          "status",
+          "checked_at"
+        ],
+        "title": "SourceStatus",
+        "type": "object"
+      },
+      "SpeedPoint": {
+        "properties": {
+          "dq_flags": {
+            "description": "Silver 가 붙인 품질 표시(예: speed_zero). 값이 틀릴 수 있다는 전제로 그대로 노출",
+            "items": {
+              "type": "string"
+            },
+            "title": "Dq Flags",
+            "type": "array"
+          },
+          "event_time": {
+            "format": "date-time",
+            "title": "Event Time",
+            "type": "string"
+          },
+          "fetched_at": {
+            "format": "date-time",
+            "title": "Fetched At",
+            "type": "string"
+          },
+          "speed_kmh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speed Kmh"
+          },
+          "travel_time_sec": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Travel Time Sec"
+          }
+        },
+        "required": [
+          "event_time",
+          "fetched_at"
+        ],
+        "title": "SpeedPoint",
+        "type": "object"
+      },
+      "Threshold": {
+        "properties": {
+          "computed_at": {
+            "format": "date-time",
+            "title": "Computed At",
+            "type": "string"
+          },
+          "day_type": {
+            "enum": [
+              "weekday",
+              "sat",
+              "sun",
+              "holiday"
+            ],
+            "title": "Day Type",
+            "type": "string"
+          },
+          "kst_hour": {
+            "title": "Kst Hour",
+            "type": "integer"
+          },
+          "link_id": {
+            "title": "Link Id",
+            "type": "string"
+          },
+          "n_days": {
+            "title": "N Days",
+            "type": "integer"
+          },
+          "n_obs": {
+            "title": "N Obs",
+            "type": "integer"
+          },
+          "provisional": {
+            "title": "Provisional",
+            "type": "boolean"
+          },
+          "span_days": {
+            "title": "Span Days",
+            "type": "integer"
+          },
+          "speed_p10": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speed P10"
+          },
+          "speed_p25": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speed P25"
+          },
+          "speed_p50": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speed P50"
+          },
+          "speed_p90": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speed P90"
+          },
+          "sufficient": {
+            "title": "Sufficient",
+            "type": "boolean"
+          },
+          "version_date": {
+            "format": "date",
+            "title": "Version Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version_date",
+          "link_id",
+          "day_type",
+          "kst_hour",
+          "n_obs",
+          "n_days",
+          "span_days",
+          "sufficient",
+          "provisional",
+          "computed_at"
+        ],
+        "title": "Threshold",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "WeatherEffect": {
+        "properties": {
+          "insufficient": {
+            "description": "n_hours < 20 이면 true — 읽지 말 것",
+            "title": "Insufficient",
+            "type": "boolean"
+          },
+          "n_hours": {
+            "title": "N Hours",
+            "type": "integer"
+          },
+          "n_links": {
+            "title": "N Links",
+            "type": "integer"
+          },
+          "precip_class": {
+            "enum": [
+              "none",
+              "light",
+              "moderate",
+              "heavy",
+              "snow_mix"
+            ],
+            "title": "Precip Class",
+            "type": "string"
+          },
+          "provisional": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provisional"
+          },
+          "ratio_p25": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ratio P25"
+          },
+          "ratio_p50": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ratio P50"
+          },
+          "ratio_p75": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ratio P75"
+          }
+        },
+        "required": [
+          "precip_class",
+          "n_hours",
+          "n_links",
+          "insufficient"
+        ],
+        "title": "WeatherEffect",
+        "type": "object"
+      },
+      "WeatherObs": {
+        "properties": {
+          "base_time": {
+            "format": "date-time",
+            "title": "Base Time",
+            "type": "string"
+          },
+          "event_date": {
+            "format": "date",
+            "title": "Event Date",
+            "type": "string"
+          },
+          "is_weekend": {
+            "title": "Is Weekend",
+            "type": "boolean"
+          },
+          "iso_dow": {
+            "title": "Iso Dow",
+            "type": "integer"
+          },
+          "nx": {
+            "title": "Nx",
+            "type": "integer"
+          },
+          "ny": {
+            "title": "Ny",
+            "type": "integer"
+          },
+          "pty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pty"
+          },
+          "reh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reh"
+          },
+          "rn1": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rn1"
+          },
+          "t1h": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "T1H"
+          },
+          "uuu": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uuu"
+          },
+          "value_unparsed_count": {
+            "title": "Value Unparsed Count",
+            "type": "integer"
+          },
+          "vec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vec"
+          },
+          "vvv": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vvv"
+          },
+          "wsd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wsd"
+          }
+        },
+        "required": [
+          "base_time",
+          "nx",
+          "ny",
+          "value_unparsed_count",
+          "event_date",
+          "iso_dow",
+          "is_weekend"
+        ],
+        "title": "WeatherObs",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "UrbanStream Gold/Mart 읽기 전용 API. 값은 Gold 적재(매시 20분) 기준이라 실시간이 아니며, 모든 응답의 meta 에 as_of / age_sec / stale / loaded_at 이 들어 있다. 버스의 '지연'은 시간표 대비가 아니라 도착 예측 변동·구간 통과 시간이다.",
+    "title": "UrbanStream API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "프로세스 생존 확인(DB 를 보지 않음)",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/ready": {
+      "get": {
+        "operationId": "ready",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "description": "DB 에 연결할 수 없음"
+          }
+        },
+        "summary": "DB 연결 확인",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/v1/anomalies": {
+      "get": {
+        "operationId": "list_anomalies",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "link_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 40,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Link Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "anomaly",
+                    "candidate",
+                    "degenerate_baseline"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "slow",
+                    "fast"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Direction"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedEnvelope_Anomaly_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "최근 속도 이상 (최신순, 최근 7일 안에서만)",
+        "tags": [
+          "anomalies"
+        ]
+      }
+    },
+    "/v1/bus/arrival-drift": {
+      "get": {
+        "operationId": "bus_arrival_drift",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "route_id",
+            "required": true,
+            "schema": {
+              "maxLength": 40,
+              "title": "Route Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "station_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 40,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Station Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedEnvelope_ArrivalDrift_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "도착 예측 변동(시간·정류소별 중앙값/p90) — 시간표 대비 지연 아님",
+        "tags": [
+          "bus"
+        ]
+      }
+    },
+    "/v1/bus/positions": {
+      "get": {
+        "operationId": "bus_positions",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "route_id",
+            "required": true,
+            "schema": {
+              "maxLength": 40,
+              "title": "Route Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "이 분 안에 관측된 차량만",
+            "in": "query",
+            "name": "within_min",
+            "required": false,
+            "schema": {
+              "default": 15,
+              "description": "이 분 안에 관측된 차량만",
+              "maximum": 120,
+              "minimum": 1,
+              "title": "Within Min",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 300,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_BusPosition__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "노선의 차량별 가장 최근 위치 (수집 창 밖에는 비어 있을 수 있음)",
+        "tags": [
+          "bus"
+        ]
+      }
+    },
+    "/v1/bus/section-slowness": {
+      "get": {
+        "operationId": "bus_section_slowness",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "route_id",
+            "required": true,
+            "schema": {
+              "maxLength": 40,
+              "title": "Route Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "description": "이 값 이상으로 느린 통과만",
+            "in": "query",
+            "name": "min_ratio",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 100,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "이 값 이상으로 느린 통과만",
+              "title": "Min Ratio"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedEnvelope_SectionSlowness_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "구간 통과 시간과 평소 대비 비 (±90초 오차)",
+        "tags": [
+          "bus"
+        ]
+      }
+    },
+    "/v1/dq/latest": {
+      "get": {
+        "operationId": "dq_latest",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "pass",
+                    "warn",
+                    "fail",
+                    "unknown",
+                    "skipped"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "description": "detail 이면 규칙별 상세(JSON)를 포함",
+            "in": "query",
+            "name": "include",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "const": "detail",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "detail 이면 규칙별 상세(JSON)를 포함",
+              "title": "Include"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_List_DqLatest__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "규칙·대상별 가장 최근 DQ 결과",
+        "tags": [
+          "pipeline"
+        ]
+      }
+    },
+    "/v1/dq/summary": {
+      "get": {
+        "operationId": "dq_summary",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 7,
+              "maximum": 60,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_List_DqSummary__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "날짜별 데이터 품질 요약",
+        "tags": [
+          "pipeline"
+        ]
+      }
+    },
+    "/v1/incidents": {
+      "get": {
+        "operationId": "incidents_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "acc_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 40,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Acc Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedEnvelope_IncidentImpactItem_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "돌발 에피소드와 속도 영향(확정은 해제 24시간 뒤, 7일 넘는 장기 공사는 제외)",
+        "tags": [
+          "incidents"
+        ]
+      }
+    },
+    "/v1/incidents/active": {
+      "get": {
+        "operationId": "incidents_active",
+        "parameters": [
+          {
+            "description": "장기 공사 포함",
+            "in": "query",
+            "name": "include_long_term",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "장기 공사 포함",
+              "title": "Include Long Term",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_List_IncidentEpisode__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "지금 목록에 있는 돌발 상황",
+        "tags": [
+          "incidents"
+        ]
+      }
+    },
+    "/v1/incidents/impact-by-type": {
+      "get": {
+        "operationId": "incidents_impact_by_type",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_List_ImpactByType__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "돌발 유형별 속도 영향 요약",
+        "tags": [
+          "incidents"
+        ]
+      }
+    },
+    "/v1/links": {
+      "get": {
+        "operationId": "list_links",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "description": "true 면 실제로 수집 중인 링크만",
+            "in": "query",
+            "name": "collected_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "true 면 실제로 수집 중인 링크만",
+              "title": "Collected Only",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "true 면 GeoJSON 형상 포함 (limit 최대 100)",
+            "in": "query",
+            "name": "geometry",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "true 면 GeoJSON 형상 포함 (limit 최대 100)",
+              "title": "Geometry",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedEnvelope_Link_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "도로 링크 목록 (link_id 순)",
+        "tags": [
+          "traffic"
+        ]
+      }
+    },
+    "/v1/links/{link_id}": {
+      "get": {
+        "operationId": "get_link",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "title": "Link Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_Link_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "없는 링크"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "링크 1건 (형상 포함)",
+        "tags": [
+          "traffic"
+        ]
+      }
+    },
+    "/v1/pipeline/alerts": {
+      "get": {
+        "operationId": "pipeline_alerts",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "level",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "info",
+                    "warning",
+                    "error",
+                    "critical"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Level"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_List_AlertRecent__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "최근 7일 알림",
+        "tags": [
+          "pipeline"
+        ]
+      }
+    },
+    "/v1/pipeline/gaps": {
+      "get": {
+        "operationId": "pipeline_gaps",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_List_DataGap__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "최근 30일 수집 공백",
+        "tags": [
+          "pipeline"
+        ]
+      }
+    },
+    "/v1/pipeline/health": {
+      "get": {
+        "operationId": "pipeline_health",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_PipelineHealth_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "파이프라인 전체 건강(한 줄에 하나씩)",
+        "tags": [
+          "pipeline"
+        ]
+      }
+    },
+    "/v1/pipeline/layers": {
+      "get": {
+        "operationId": "pipeline_layers",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_List_LayerStatus__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Bronze/Silver 층별 상태",
+        "tags": [
+          "pipeline"
+        ]
+      }
+    },
+    "/v1/pipeline/loads": {
+      "get": {
+        "operationId": "pipeline_loads",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_List_LoadRun__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "최근 Gold 적재 실행 (최대 100건)",
+        "tags": [
+          "pipeline"
+        ]
+      }
+    },
+    "/v1/pipeline/marts": {
+      "get": {
+        "operationId": "pipeline_marts",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_List_MartFreshness__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "마트 신선도",
+        "tags": [
+          "pipeline"
+        ]
+      }
+    },
+    "/v1/pipeline/sources": {
+      "get": {
+        "operationId": "pipeline_sources",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_List_SourceStatus__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "수집 소스별 상태",
+        "tags": [
+          "pipeline"
+        ]
+      }
+    },
+    "/v1/traffic/current": {
+      "get": {
+        "operationId": "traffic_current",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "link_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 40,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Link Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "level",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "severe",
+                    "heavy",
+                    "slow",
+                    "normal"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Level"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedEnvelope_Congestion_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "링크별 가장 최근 속도·혼잡 단계·기준선 대비 (Gold 적재 기준, 실시간 아님)",
+        "tags": [
+          "traffic"
+        ]
+      }
+    },
+    "/v1/traffic/speeds": {
+      "get": {
+        "operationId": "traffic_speeds",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "maxLength": 40,
+              "title": "Link Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "포함. 오프셋 필수(예: 2026-11-05T09:00:00%2B09:00)",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "포함. 오프셋 필수(예: 2026-11-05T09:00:00%2B09:00)",
+              "title": "From"
+            }
+          },
+          {
+            "description": "제외. 기본은 지금",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "제외. 기본은 지금",
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedEnvelope_SpeedPoint_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "없는 링크"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "한 링크의 기간별 속도 (최대 7일)",
+        "tags": [
+          "traffic"
+        ]
+      }
+    },
+    "/v1/traffic/thresholds": {
+      "get": {
+        "operationId": "traffic_thresholds",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "maxLength": 40,
+              "title": "Link Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "day_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "weekday",
+                    "sat",
+                    "sun",
+                    "holiday"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Day Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_List_Threshold__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "한 링크의 혼잡 임계값(최신 버전, 요일유형×시각)",
+        "tags": [
+          "traffic"
+        ]
+      }
+    },
+    "/v1/weather/effect": {
+      "get": {
+        "operationId": "weather_effect",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_List_WeatherEffect__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "강수 등급별 속도 비(기준선 대비) — 연관이지 인과 아님, insufficient=true 면 읽지 말 것",
+        "tags": [
+          "weather"
+        ]
+      }
+    },
+    "/v1/weather/observations": {
+      "get": {
+        "operationId": "weather_observations",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedEnvelope_WeatherObs_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "기간별 날씨 관측 (최대 7일)",
+        "tags": [
+          "weather"
+        ]
+      }
+    }
+  },
+  "tags": [
+    {
+      "description": "상태 확인(인증 불필요)",
+      "name": "system"
+    },
+    {
+      "description": "파이프라인·데이터 품질 운영 상태 (Step 8 ops 뷰)",
+      "name": "pipeline"
+    },
+    {
+      "description": "도로 속도·혼잡 (Step 6/7 마트)",
+      "name": "traffic"
+    },
+    {
+      "description": "돌발 상황과 속도 영향",
+      "name": "incidents"
+    },
+    {
+      "description": "버스 도착 예측 변동·구간 통과 시간",
+      "name": "bus"
+    },
+    {
+      "description": "날씨와 도로 속도",
+      "name": "weather"
+    },
+    {
+      "description": "속도 이상 후보",
+      "name": "anomalies"
+    }
+  ]
+}

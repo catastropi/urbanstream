@@ -18,7 +18,8 @@ def test_example_has_stack_section_with_expected_keys():
     assert keys == ["COMPOSE_PROFILES", "POSTGRES_USER", "POSTGRES_DB", "POSTGRES_PASSWORD", "POSTGRES_PORT",
                     "KAFKA_EXTERNAL_PORT", "KAFKA_UI_PORT", "KAFKA_CLUSTER_ID",
                     "AIRFLOW_UI_PORT", "AIRFLOW_ADMIN_USER", "AIRFLOW_ADMIN_PASSWORD", "AIRFLOW_DB_PASSWORD",
-                    "GOLD_LOADER_PASSWORD", "AIRFLOW_FERNET_KEY", "AIRFLOW_JWT_SECRET"]
+                    "GOLD_LOADER_PASSWORD", "AIRFLOW_FERNET_KEY", "AIRFLOW_JWT_SECRET",
+                    "API_PORT", "API_DB_PASSWORD", "API_KEYS"]
     assert dict(stack_env.stack_defaults(EXAMPLE))["POSTGRES_PASSWORD"] == ""  # 예제에 비밀번호를 적어 두지 않는다
 
 
@@ -35,6 +36,10 @@ def test_adds_missing_keys_generates_secrets_and_keeps_other_lines_untouched():
     for k in ("AIRFLOW_DB_PASSWORD", "GOLD_LOADER_PASSWORD", "AIRFLOW_ADMIN_PASSWORD"):
         assert re.fullmatch(r"[0-9a-f]{32}", values[k]), k
     assert len(values["AIRFLOW_JWT_SECRET"]) >= 32
+    # Step 9: API 비밀 — 로그인 비밀번호는 다른 비밀번호와 달라야 하고, 키는 24자 이상이며 목록 구분자(쉼표)가 없다
+    assert re.fullmatch(r"[0-9a-f]{32}", values["API_DB_PASSWORD"]) and values["API_PORT"] == "8010"
+    assert len(values["API_KEYS"]) >= 24 and "," not in values["API_KEYS"]
+    assert len({values[k] for k in ("POSTGRES_PASSWORD", "AIRFLOW_DB_PASSWORD", "GOLD_LOADER_PASSWORD", "AIRFLOW_ADMIN_PASSWORD", "API_DB_PASSWORD")}) == 5
     assert len({values[k] for k in ("POSTGRES_PASSWORD", "AIRFLOW_DB_PASSWORD", "GOLD_LOADER_PASSWORD", "AIRFLOW_ADMIN_PASSWORD")}) == 4  # 서로 달라야 한다
     assert values["POSTGRES_PORT"] == "5433" and values["COMPOSE_PROFILES"] == "core"
 

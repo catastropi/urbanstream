@@ -1,0 +1,7 @@
+# Step 9 API 컨테이너 의존성 (docker/api/Dockerfile 이 이것만 설치한다). 샌드박스(Python 3.11)에서 시험한 버전으로 고정.
+# starlette 은 fastapi 가 끌어온다. 올릴 때는 tests/api 와 OpenAPI 스냅샷(tests/contract) 이 통과하는지 먼저 본다.
+fastapi==0.162.0
+uvicorn==0.54.0
+pydantic==2.14.2
+psycopg[binary]==3.3.8
+psycopg-pool==3.3.3

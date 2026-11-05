@@ -1,7 +1,7 @@
 # UrbanStream docker-compose.yml  (Step 2: 인프라 3종)
 #
 # 지금 들어 있는 것: postgres(PostGIS), kafka(KRaft 단일 노드), kafka-ui(개발용), spark-bronze(Step 4)
-# 아직 없는 것(만드는 단계에서 추가): spark silver(Step 5), airflow(Step 7), api(Step 9), monitoring(Step 8), minio(선택).
+# 아직 없는 것(만드는 단계에서 추가): minio(선택).
 #   (collector 는 호스트에서 직접 실행한다 — ADR-0004.) 이미지가 없는 서비스를 미리 적어 두지 않는다.
 #
 # profiles
@@ -10,6 +10,7 @@
 #   streaming : spark-bronze          (COMPOSE_PROFILES=core,streaming — scripts/stack.sh up-streaming)
 #   airflow   : airflow-scheduler/apiserver/dag-processor  (Step 7 — scripts/stack.sh up-airflow)
 #   monitor   : monitor (Step 8 — 감사 토픽 감시 + 알림. scripts/stack.sh up-monitor)
+#   api       : api (Step 9 — FastAPI 읽기 전용 서빙. scripts/stack.sh up-api, http://127.0.0.1:8010/docs)
 #
 # 사용법은 docs/runbooks/step2-stack.md, 결정 근거는 docs/adr/0003-compose-infra.md.
 # 모든 포트는 127.0.0.1 에만 연다 (같은 와이파이의 다른 기기에서 접근 불가).
@@ -331,6 +332,53 @@ services:
       retries: 3
       start_period: 120s
     mem_limit: ${MONITOR_MEM_LIMIT:-256m}
+
+  # Step 9: 읽기 전용 API. 결정 근거 docs/adr/0011-step9-api.md, 사용법 docs/runbooks/step9-api.md
+  # - DB 는 api_service 역할(013, SELECT 전용 + 5초 제한)로만 붙는다. 업무 DB 관리자·gold_loader 비밀번호는 넣지 않는다.
+  # - ${...:-} 를 쓰는 이유: `:?` 로 필수 처리하면 stack.sh 의 ps/down/stats(--profile '*')가 API 키 없이는 전부 실패한다.
+  #   대신 앱이 키·비밀번호가 비어 있으면 기동을 거부한다(fail-closed) — scripts/stack.sh up-api 가 미리 안내한다.
+  # - 읽기 전용 파일시스템, 모든 capability 제거. 포트는 127.0.0.1 에만 연다.
+  api:
+    <<: *restart
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    image: urbanstream/api:${API_IMAGE_TAG:-1.0.0}
+    profiles: ["api"]
+    container_name: urbanstream-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TZ: UTC
+      API_KEYS: ${API_KEYS:-}
+      API_DB_PASSWORD: ${API_DB_PASSWORD:-}
+      API_DB_HOST: postgres
+      API_DB_PORT: "5432"
+      API_DB_NAME: ${POSTGRES_DB:-urbanstream}
+      API_DB_USER: api_service
+      API_RATE_LIMIT_PER_MIN: ${API_RATE_LIMIT_PER_MIN:-120}
+      API_RATE_BURST: ${API_RATE_BURST:-40}
+      API_CORS_ORIGINS: ${API_CORS_ORIGINS:-}
+      API_DOCS_ENABLED: ${API_DOCS_ENABLED:-true}
+      API_STALE_AFTER_SEC: ${API_STALE_AFTER_SEC:-10800}
+    ports:
+      - "127.0.0.1:${API_PORT:-8010}:8000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      # /health 는 DB 를 보지 않는다(프로세스 생존). DB 는 /ready 로 따로 본다.
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).status == 200 else 1)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    mem_limit: ${API_MEM_LIMIT:-256m}
 
 volumes:
   postgres-data:

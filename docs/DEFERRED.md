@@ -163,3 +163,25 @@
 | D-143 | Discord 전달 실패 기록 6건 | ❓ 원인 미확인 | 11-05 11:43 알림에 `(이전 전달 실패 6건)` 이 붙었다. 어느 시점의 어떤 오류(속도 제한 429? 네트워크? 길이?)인지 아직 모른다 | 👤 `ops.alert_event` 의 실패 기록 확인 → Claude 가 분석 |
 | D-144 | 알림 안내문의 서비스 이름 오류 | ✅ 수정 | `docker compose logs bronze-job` 처럼 없는 서비스 이름을 안내했다. 실제는 `spark-bronze`/`spark-silver` → `docker compose logs --tail 60 spark-<계층>` | — |
 | D-145 | 시간당 푸시 상한이 critical 까지 막음 | ✅ 수정 (Mac 재확인 대기) | Mac 11-05 12:28 Bronze·Silver 복구로 '해소' 알림이 몰려 시간당 10건 상한이 찼고, 12:32 Kafka 다운 critical 이 매분 `suppressed`(억제)돼 7분 넘게 알림이 오지 않았다(모니터는 3회 실패를 정상 감지). critical 은 상한에서 제외. 남은 개선: '해소'(info) 알림이 상한을 채우지 않게 집계에서 빼거나 묶는 것 | 👤 kafka-down 훈련 재시험 |
+| D-146 | 사용자 확인 대기 3건 (Step 9 와 무관) | 👤 | ① Spark 중단 훈련(spark-down 후 약 20분 뒤 '적재 정체' 알림 → spark-up → 해소) 결과 보고 ② 내일(11-06) 04:00 버스 창이 열린 직후 오경보가 없는지(D-141) ③ 2026-11-12 이후 DQ 임계값 검토·`shadow_until` 해제(D-121) | `docs/runbooks/step8-recovery.md`, `SELECT rule_id, status, value FROM ops.v_dq_latest` |
+
+## I. Step 9 (FastAPI 서빙) — 11-05
+
+모든 항목은 **샌드박스(Python 3.11 · Postgres 16 + PostGIS · 실제 uvicorn)에서만 검증**했다. Docker 이미지 빌드·컨테이너 기동·Mac 실측은 확인 전이다. 결정: `docs/adr/0011-step9-api.md`, 실행: `docs/runbooks/step9-api.md`.
+
+| ID | 항목 | 상태 | 현재 알려진 것 | 확인 방법 / 어디에 |
+|---|---|---|---|---|
+| D-147 | Mac 에서 확인할 것(9) | 👤 | ① `scripts/stack.sh up-api` 로 이미지 빌드(python:3.12-slim-bookworm, 의존성 휠)·healthy ② Compose v2.10.2 에서 `api` 서비스 동작 ③ `docker stats` 메모리 — 샌드박스 RSS 62→82 MiB, 한도 `API_MEM_LIMIT` 기본 256m 은 **[추정]** ④ (샌드박스에서 3.11·3.12·3.13 통과 — Mac 의 Python 에서만 재확인) ⑤ 실제 데이터로 `/v1/traffic/current` 응답 시간 | `docs/runbooks/step9-api.md` §2~4 |
+| D-148 | 인증은 정적 API 키 | ⏸ | `X-API-Key` 여러 개(교체용). 사용자별 권한·키 만료·감사 로그의 사용자 구분(해시 앞 8자 `key_id` 뿐)은 없다. HTTPS 는 없다(127.0.0.1 바인딩) | 외부에 공개하려면 리버스 프록시(TLS)·키별 권한을 별도 설계 |
+| D-149 | "현재" 값은 실시간이 아니다 | ✅ 문서화 | Gold 적재가 매시 20분 → `current` 류는 최대 약 80분 늦다. 모든 응답의 `meta.as_of/age_sec/stale/loaded_at` 로 드러낸다(기본 3시간 넘으면 `stale`) | Step 10 대시보드가 이 값을 화면에 표시해야 한다 |
+| D-150 | 속도 제한·캐시가 프로세스 안 | ⏸ | 워커 1개 전제. 재시작하면 초기화, 컨테이너를 여러 개 띄우면 한도가 키별이 아니라 컨테이너별로 적용된다 | 확장이 필요하면 Redis 등 공유 저장소 |
+| D-151 | 버스 엔드포인트의 의미 | ✅ 문서화 · ❓ | `arrival-drift`(도착 예측 변동)·`section-slowness`(구간 통과 시간)는 **시간표 대비 지연이 아니다**(처음 제안의 `/delays` 에서 이름 변경). `sect_ord` 가 구간 경계에서 바뀐다는 가정은 D-103(Mac 데이터로 지지됨). 수집 창(04:00~) 밖 `positions` 는 비어 있다 | OpenAPI 설명과 `meta.notes` 에 적혀 있음 |
+| D-152 | 응답 시각은 UTC | ✅ 결정(D9-13) | 일 단위 필드(`event_date`, `kst_hour`)는 마트 정의대로 KST. 클라이언트가 변환 | Step 10 에서 KST 표시 |
+| D-153 | `current` 는 `dim_link` 에 없는 link_id 의 관측을 내지 않는다 | ⏸ | 성능 때문에 링크 기준 LATERAL 로 읽는다(D9-12). 시드된 참조 링크에 없는 id 가 fact 에 있다면 누락된다(시험으로 고정) | `SELECT DISTINCT link_id FROM fact.traffic_speed t WHERE NOT EXISTS (SELECT 1 FROM dim.dim_link d WHERE d.link_id = t.link_id)` — 비어 있어야 정상 |
+| D-154 | 장기 관측 수치가 합성 데이터 기반 | ❓ | 응답 시간은 링크 300·속도 150만 행·버스 67만 행 합성 데이터로 쟀다. 실제 링크 수·기간이 늘면 `traffic/current` 외의 `DISTINCT ON` 류(`bus/positions`)도 재측정 | Mac 에서 `time curl …`, 느리면 마트에 "최신" 표 추가(새 마이그레이션) |
+| D-155 | 키셋 커서는 일관된 스냅샷이 아니다 | ✅ 설계 | 쪽을 넘기는 사이에 들어온 새 행은 앞쪽(정렬 기준 뒤)에서 보이지 않을 수 있고, 같은 정렬 키 중복은 보조 키로 처리한다. 시험: 정렬 키 동률에서도 끝까지 따라가면 빠짐·중복 없음 | — |
+| D-156 | OpenAPI 계약과 라이브러리 경고 | ✅ · 🔧 | 스냅샷 시험이 계약 변경을 잡는다. Starlette 가 `httpx` 대신 `httpx2` 를 권하는 경고가 TestClient 에 나온다(동작 무관) | 다음 의존성 점검 때 `httpx2` 로 교체 검토 |
+| D-157 | Compose 에서 `${API_KEYS:-}` (필수 `:?` 아님) | ✅ 설계 이탈 | 다른 서비스는 비밀을 `:?` 로 필수 처리하지만 `api` 만 그러면 `stack.sh ps/down/stats`(`--profile '*'`)가 API 키 없이 전부 실패한다. 대신 앱이 빈 키·비밀번호로 기동을 거부(fail-closed)하고 `up-api` 가 미리 안내. 시험: 정책 테스트·`docker compose config` | — |
+| D-158 | `api_service` 비밀번호는 `db_bootstrap.py --api` 로만 | ✅ 설계 | 013 은 NOLOGIN 으로 만들어 안전한 쪽으로 실패. 역할 시험(`test_api_role.py`)은 클러스터 전체 역할을 지우므로 `ALLOW_ROLE_TESTS=1` 이 있을 때만 돈다(운영과 같은 클러스터에서 비밀번호를 지우는 사고 방지) | 런북 §6·§7 |
+| D-159 | 부하 수치는 샌드박스(CPU 2개를 Postgres 와 공유) | ❓ | 141 rps · p95 192ms · 오류 0 은 동시 20개 기준. 대시보드 사용량(소수 동시 사용자)에는 충분하다고 [추정]. Mac 값은 다르다 | D-147 ⑤ |
+| D-160 | 변이 시험 도구와 CI | ✅ · ⏸ Step 11 | `scripts/mutation_api.py` 30건(약 5분, Postgres 필요)은 수동 실행. CI 에는 `tests/api`(DB 없는 부분 + Postgres 서비스 컨테이너)와 `export_openapi.py --check` 를 넣는다 | Step 11 |

@@ -15,7 +15,7 @@ CORE = ("postgres", "kafka")
 
 def test_expected_services_and_profiles():
     assert set(SERVICES) == {"postgres", "kafka", "kafka-ui", "spark-bronze", "spark-silver", "spark-gold",
-                             "airflow-scheduler", "airflow-apiserver", "airflow-dag-processor", "monitor"}
+                             "airflow-scheduler", "airflow-apiserver", "airflow-dag-processor", "monitor", "api"}
     assert SERVICES["postgres"]["profiles"] == ["core"] and SERVICES["kafka"]["profiles"] == ["core"]
     assert SERVICES["kafka-ui"]["profiles"] == ["dev"]
     assert SERVICES["spark-bronze"]["profiles"] == ["streaming"]    # core 만 켜면 Spark 는 뜨지 않는다 (메모리)
@@ -303,3 +303,56 @@ def test_alert_webhook_url_is_referenced_by_name_only():
     assert not re.search(r"https://(?:discord|hooks\.slack)", text), "웹훅 URL 을 compose 에 직접 쓰지 않습니다"
     assert SERVICES["airflow-scheduler"]["environment"]["ALERT_WEBHOOK_URL"].startswith("${ALERT_WEBHOOK_URL")
     assert SERVICES["monitor"]["environment"]["ALERT_WEBHOOK_URL"].startswith("${ALERT_WEBHOOK_URL")
+
+
+# ------------------------------------------------------------------ Step 9: api
+def test_api_service_is_opt_in_localhost_only_and_memory_limited():
+    api = SERVICES["api"]
+    assert api["profiles"] == ["api"]                                   # core 만 켜면 API 는 뜨지 않는다
+    assert api["ports"] == ["127.0.0.1:${API_PORT:-8010}:8000"]
+    assert api["mem_limit"] == "${API_MEM_LIMIT:-256m}"
+    assert api["container_name"] == "urbanstream-api"
+    assert api["depends_on"]["postgres"]["condition"] == "service_healthy"
+    assert "healthcheck" in api
+
+
+def test_api_is_hardened_and_gets_no_admin_secrets():
+    api = SERVICES["api"]
+    assert api["read_only"] is True and api["cap_drop"] == ["ALL"] and "no-new-privileges:true" in api["security_opt"]
+    assert api["tmpfs"] == ["/tmp"]
+    assert "env_file" not in api and not api.get("volumes"), "API 는 .env 전체도 데이터 폴더도 받지 않는다"
+    env = api["environment"]
+    assert env["API_DB_USER"] == "api_service" and env["API_DB_HOST"] == "postgres"
+    text = str(env)
+    for forbidden in ("POSTGRES_PASSWORD", "GOLD_LOADER_PASSWORD", "GOLD_WRITER_PASSWORD", "AIRFLOW_", "ALERT_WEBHOOK"):
+        assert forbidden not in text, f"api 환경에 {forbidden} 가 들어 있다"
+    assert "docker.sock" not in str(api), "소켓 마운트 금지"
+
+
+def test_api_secrets_come_from_env_by_name_and_compose_does_not_require_them():
+    """`:?` 로 필수 처리하면 stack.sh 의 ps/down/stats(--profile '*')가 API 키 없이 전부 깨진다 → `:-` + 앱의 기동 거부(fail-closed)."""
+    env = SERVICES["api"]["environment"]
+    assert env["API_KEYS"] == "${API_KEYS:-}" and env["API_DB_PASSWORD"] == "${API_DB_PASSWORD:-}"
+    assert not re.search(r"API_(KEYS|DB_PASSWORD):\s*[A-Za-z0-9]", (ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
+
+
+def test_api_dockerfile_is_pinned_unprivileged_and_copies_only_the_api():
+    df = (ROOT / "docker/api/Dockerfile").read_text(encoding="utf-8")
+    assert re.search(r"ARG PYTHON_IMAGE=python:3\.\d+-slim-bookworm", df)
+    assert re.search(r"^USER 10001$", df, re.M)
+    copies = re.findall(r"^COPY (.+)$", df, re.M)
+    assert copies == ["requirements-api.txt ./", "api ./api"], copies
+    assert "--workers\", \"1\"" in df, "속도 제한·캐시가 프로세스 안에 있어 워커는 1개여야 한다"
+    assert ".env" not in " ".join(copies) and "data" not in " ".join(copies)
+
+
+def test_api_requirements_are_exactly_pinned():
+    lines = [l.strip() for l in (ROOT / "requirements-api.txt").read_text(encoding="utf-8").splitlines() if l.strip() and not l.startswith("#")]
+    assert lines and all("==" in l for l in lines), lines
+    assert {l.split("==")[0].split("[")[0] for l in lines} >= {"fastapi", "uvicorn", "pydantic", "psycopg", "psycopg-pool"}
+
+
+def test_stack_sh_up_api_checks_keys_before_starting():
+    sh = (ROOT / "scripts/stack.sh").read_text(encoding="utf-8")
+    block = sh.split("up-api)")[1].split(";;")[0]
+    assert block.index("API_KEYS") < block.index("docker compose up") and "db_bootstrap.py --api" in block and "--build" in block
