@@ -7,6 +7,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
+# 기본 환경에 fastapi 가 없으면 오류 대신 건너뛴다(설치: pip install -r requirements-api.txt)
+pytest.importorskip("fastapi")
+
 ROOT = Path(__file__).resolve().parents[2]
 SNAP = ROOT / "tests" / "contract" / "snapshots" / "openapi_v1.json"
 

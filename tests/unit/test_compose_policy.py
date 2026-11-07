@@ -15,7 +15,7 @@ CORE = ("postgres", "kafka")
 
 def test_expected_services_and_profiles():
     assert set(SERVICES) == {"postgres", "kafka", "kafka-ui", "spark-bronze", "spark-silver", "spark-gold",
-                             "airflow-scheduler", "airflow-apiserver", "airflow-dag-processor", "monitor", "api"}
+                             "airflow-scheduler", "airflow-apiserver", "airflow-dag-processor", "monitor", "api", "dashboard"}
     assert SERVICES["postgres"]["profiles"] == ["core"] and SERVICES["kafka"]["profiles"] == ["core"]
     assert SERVICES["kafka-ui"]["profiles"] == ["dev"]
     assert SERVICES["spark-bronze"]["profiles"] == ["streaming"]    # core 만 켜면 Spark 는 뜨지 않는다 (메모리)
@@ -356,3 +356,59 @@ def test_stack_sh_up_api_checks_keys_before_starting():
     sh = (ROOT / "scripts/stack.sh").read_text(encoding="utf-8")
     block = sh.split("up-api)")[1].split(";;")[0]
     assert block.index("API_KEYS") < block.index("docker compose up") and "db_bootstrap.py --api" in block and "--build" in block
+
+
+# ------------------------------------------------------------------ Step 10: dashboard
+def test_dashboard_service_is_opt_in_localhost_only_and_waits_for_api():
+    d = SERVICES["dashboard"]
+    assert d["profiles"] == ["dashboard"]                                # 켜지 않으면 뜨지 않는다
+    assert d["ports"] == ["127.0.0.1:${DASHBOARD_PORT:-8501}:8501"]
+    assert d["mem_limit"] == "${DASHBOARD_MEM_LIMIT:-512m}"
+    assert d["container_name"] == "urbanstream-dashboard"
+    assert d["depends_on"]["api"]["condition"] == "service_healthy" and "postgres" not in d["depends_on"]
+    assert "_stcore/health" in str(d["healthcheck"])
+
+
+def test_dashboard_is_hardened_and_cannot_reach_the_database():
+    d = SERVICES["dashboard"]
+    assert d["read_only"] is True and d["cap_drop"] == ["ALL"] and "no-new-privileges:true" in d["security_opt"]
+    assert d["tmpfs"] == ["/tmp"]
+    assert "env_file" not in d and not d.get("volumes")
+    env = d["environment"]
+    assert env["DASHBOARD_API_URL"] == "http://api:8000"
+    text = str(env)
+    for forbidden in ("POSTGRES", "GOLD_", "API_DB_", "AIRFLOW_", "ALERT_WEBHOOK", "SEOUL_API_KEY", "API_KEYS"):
+        assert forbidden not in text, f"dashboard 환경에 {forbidden} 가 들어 있다 (데이터 입구는 API 키 하나뿐)"
+    assert "docker.sock" not in str(d)
+
+
+def test_dashboard_key_comes_from_env_by_name_and_compose_does_not_require_it():
+    env = SERVICES["dashboard"]["environment"]
+    assert env["DASHBOARD_API_KEY"] == "${DASHBOARD_API_KEY:-}"
+    text = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    assert not re.search(r"DASHBOARD_API_KEY:\s*[A-Za-z0-9]", text) and "${DASHBOARD_API_KEY:?" not in text
+
+
+def test_dashboard_dockerfile_is_pinned_unprivileged_and_copies_only_the_dashboard():
+    df = (ROOT / "docker/dashboard/Dockerfile").read_text(encoding="utf-8")
+    assert re.search(r"ARG PYTHON_IMAGE=python:3\.(1[1-9]|[2-9]\d)-slim-bookworm", df), "streamlit 은 Python 3.11 이상"
+    assert re.search(r"^USER 10001$", df, re.M)
+    copies = re.findall(r"^COPY (.+)$", df, re.M)
+    assert copies == ["requirements-dashboard.txt ./", "dashboard ./dashboard"], copies
+    assert "--server.fileWatcherType=none" in df and "--browser.gatherUsageStats=false" in df and "HOME=/tmp" in df
+
+
+def test_dashboard_requirements_are_exactly_pinned_and_have_no_db_driver():
+    lines = [l.strip() for l in (ROOT / "requirements-dashboard.txt").read_text(encoding="utf-8").splitlines() if l.strip() and not l.startswith("#")]
+    assert lines and all("==" in l for l in lines), lines
+    names = {l.split("==")[0] for l in lines}
+    assert {"streamlit", "pandas", "pydeck", "requests"} <= names
+    assert not names & {"psycopg", "psycopg2", "psycopg-pool", "sqlalchemy", "fastapi"}, "DB 드라이버·서버 프레임워크는 대시보드에 없다"
+
+
+def test_stack_sh_up_dashboard_checks_keys_before_starting_and_enables_all_needed_profiles():
+    sh = (ROOT / "scripts/stack.sh").read_text(encoding="utf-8")
+    block = sh.split("up-dashboard)")[1].split(";;")[0]
+    assert block.index("DASHBOARD_API_KEY") < block.index("docker compose up")
+    assert "--check-dashboard-key" in block and "db_bootstrap.py --api" in block and "--build" in block
+    assert 'COMPOSE_PROFILES="core,api,dashboard"' in block

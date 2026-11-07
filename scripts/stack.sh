@@ -8,6 +8,7 @@
 #   scripts/stack.sh up-silver  위 + spark-bronze + spark-silver (Bronze → Silver. 메모리가 약 1.5 GiB 더 든다)
 #   scripts/stack.sh up-airflow 위 + Airflow 3개(scheduler/apiserver/dag-processor). DB 역할 준비 후 켠다 (http://127.0.0.1:8080)
 #   scripts/stack.sh up-api     읽기 전용 API 기동 (http://127.0.0.1:8010/docs). .env 에 API_KEYS·API_DB_PASSWORD 가 있어야 한다 (init-env)
+#   scripts/stack.sh up-dashboard 대시보드(Streamlit) 기동 (http://127.0.0.1:8501). API 도 함께 켠다. .env 에 DASHBOARD_API_KEY 가 있고 API_KEYS 에 들어 있어야 한다 (init-env)
 #   scripts/stack.sh up-monitor 감시 루프(monitor) 기동 — Kafka 감사 토픽·Bronze/Silver 를 감시하고 웹훅으로 알린다 (Airflow 이미지 사용)
 #   scripts/stack.sh check      상태/PostGIS/Kafka 왕복 점검
 #   scripts/stack.sh stats      컨테이너별 메모리·CPU 와 Docker VM 총 메모리 (data/stack/ 에 저장)
@@ -96,6 +97,23 @@ case "$cmd" in
     "$PY" scripts/db_bootstrap.py --api
     COMPOSE_PROFILES="core,api" docker compose up -d --build --wait
     COMPOSE_PROFILES="core,api" docker compose ps
+    ;;
+  up-dashboard)
+    need_docker
+    # 대시보드는 API 만 본다(DB 직접 연결 없음). 키가 비었거나 API_KEYS 목록에 없으면 401 만 나오므로 띄우기 전에 알려 준다
+    if ! grep -Eq '^DASHBOARD_API_KEY=.{24,}' .env 2>/dev/null || ! grep -Eq '^API_KEYS=.{24,}' .env 2>/dev/null || ! grep -Eq '^API_DB_PASSWORD=.{16,}' .env 2>/dev/null; then
+      echo ".env 에 DASHBOARD_API_KEY / API_KEYS / API_DB_PASSWORD 가 없습니다. 먼저 실행: scripts/stack.sh init-env"
+      exit 1
+    fi
+    if ! "$PY" scripts/stack_env.py --check-dashboard-key; then
+      echo "DASHBOARD_API_KEY 가 API_KEYS 목록에 없습니다. 먼저 실행: scripts/stack.sh init-env"
+      exit 1
+    fi
+    COMPOSE_PROFILES="core" docker compose up -d --wait
+    "$PY" scripts/migrate.py
+    "$PY" scripts/db_bootstrap.py --api
+    COMPOSE_PROFILES="core,api,dashboard" docker compose up -d --build --wait
+    COMPOSE_PROFILES="core,api,dashboard" docker compose ps
     ;;
   ps)
     need_docker

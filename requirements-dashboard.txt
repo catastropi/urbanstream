@@ -1,0 +1,8 @@
+# Step 10 대시보드 컨테이너 의존성 (docker/dashboard/Dockerfile 이 이것만 설치한다). 샌드박스(Python 3.12 venv)에서 시험한 버전으로 고정.
+# 대시보드는 DB 드라이버(psycopg 등)를 설치하지 않는다 — FastAPI(X-API-Key)만 데이터 입구다 (tests/dashboard/test_dash_architecture.py 가 import 를 막는다).
+# streamlit 은 Python 3.11 이상이 필요하다. 올릴 때는 tests/dashboard(AppTest 포함)가 통과하는지 먼저 본다.
+streamlit==1.66.1
+pandas==3.1.1
+pydeck==0.9.3
+altair==6.3.0
+requests==2.34.2

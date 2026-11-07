@@ -2,7 +2,7 @@
 
 "아직 안 한 것 / 확인 못 한 것 / 일부러 미룬 것"을 **어디에 추가할지**와 함께 적는 단 하나의 목록이다.
 새 채팅은 HANDOFF.md 와 함께 이 파일을 읽는다. 항목을 끝내면 상태를 바꾸고 날짜를 적는다 (지우지 않는다 — 이력이 곧 근거다).
-마지막 갱신: 2026-11-05 (Step 8 DQ·모니터링·알림·이상 탐지 구현 — 샌드박스 PostgreSQL 16 + Airflow 3.3.0 에서만 검증, Mac 실행 대기. H장 참고).
+마지막 갱신: 2026-11-05 (Step 10 대시보드·Tableau CSV 구현 — 샌드박스(가짜 API)에서만 검증, Mac 실행 대기. J장 참고).
 
 **상태:** ⏳ 미착수(할 일) · ❓ 확인 못 함(사실 여부 모름) · ⏸ 일부러 보류(이유와 재검토 시점 있음) · 👤 사용자 작업 · ✅ 완료(날짜)
 **출처:** H9 = HANDOFF 9장, A6 = ADR-0006, 11-03 = 이번 대화에서 발견
@@ -89,7 +89,7 @@
 | D-71 | `.gitignore` 결함: `data/*` + `!data/*/` 때문에 data/ 안쪽 파일이 추적 대상이었다 (임시 저장소로 재현) | 👤 일부 | 규칙은 `data/**` 로 수정·테스트함. data/ 추적 해제 커밋 완료. 과거 이력에 data/ 파일 약 6,500개(checkpoints 3,354 · bronze 2,111 · raw 580 · silver 333 · smoke 162 …), **`.env` 는 이력에 없음(확인)**. 사용자가 `../urbanstream-clean` 에서 `git filter-repo` 완료(data/ 0개, 파일 180, 커밋 3, origin 제거됨). **남은 일: 새 비공개 레포로 push 할지 / 기존 레포 force push 할지 결정**, `data/**/.gitkeep` 뼈대 복원, 작업 레포를 새 이력에 맞추기(`git remote set-url` → `fetch` → `reset --mixed origin/main`). 기존 레포 force push 시 GitHub 가 옛 객체를 얼마나 보관하는지는 **미확인** → 새 레포 권장 | Mac: `git ls-files data` 가 비어야 함. 나오면 `git rm -r --cached data` 후 커밋, **이미 push 했다면 레포가 비공개여도 이력에 남음** → 알려 주세요 |
 | D-72 | Mac(PG17.7/PostGIS 3.6.1)에서 `migrate.py`·통합 테스트 실행 | ✅ 2026-11-04 13시 | 개발은 PG16/PostGIS 3.4.2 에서만 통과 Mac PG17.7: migrate·시드(5,093링크, 수집 링크 4개 모두 존재)·적재 3회 통과, 재적재 멱등(스테이징 행 수 = DB 행 수). | runbook step6-gold.md 2~3절 |
 | D-73 | `spark-gold` 컨테이너(Java 17) 실행·메모리, Spark 가 Silver 폴더(스트리밍 기록)를 배치로 읽을 때 `_spark_metadata` 존중 여부 | ✅ 2026-11-04 14시 | spark-gold(Java 17) 실행 성공: 스테이징 **약 56초**, 메모리 표본은 **768 MiB 에서 잘림 → 최대치 미확인**(한도 1.5 GiB 안에서 성공). Silver 폴더 배치 읽기 오류 없음, silver_verify 통과. Airflow 에서는 스케줄러 컨테이너 안에서 Java 17/21 로 돈다 → D-90 | 런북 3절 실행 후 `row_counts` 를 silver_verify 와 대조 |
-| D-74 | 공휴일 데이터 | ⏳ | `dim.dim_date.is_holiday` 전부 false → 베이스라인이 공휴일을 평일로 취급 | 공공데이터(특일 정보) 승인 후 시드 마이그레이션 |
+| D-74 | 공휴일 데이터 | ⏳(2026 일부 시드 D-180) | `dim.dim_date.is_holiday` 전부 false → 베이스라인이 공휴일을 평일로 취급 | 공공데이터(특일 정보) 승인 후 시드 마이그레이션 |
 | D-75 | 버스 정류소 통과(next_stop_id 전이) 팩트 | ⏸ | 의미 미확인(D-57)이라 만들지 않음. `bus_position` 원자료는 적재됨 | 계약 v2 이후 |
 | D-76 | 돌발 `absent_since` 의 의미 | ❓ | '성공·비절단 호출에서 처음 안 보인 시각'일 뿐 해제 시각이 아님(D-38) | 하루 이상 쌓인 뒤 expected_clear_at 과 비교 |
 | D-77 | audit 에서 `skipped`(예산 소진·회로 차단) 기록은 적재하지 않음 | ✅ 2026-11-05 (ops.call_event 가 모든 audit 이벤트를 보존) | ingest_id 가 없어 PK 불가 | Step 8 DQ 설계 시 별도 표 |
@@ -185,3 +185,32 @@
 | D-158 | `api_service` 비밀번호는 `db_bootstrap.py --api` 로만 | ✅ 설계 | 013 은 NOLOGIN 으로 만들어 안전한 쪽으로 실패. 역할 시험(`test_api_role.py`)은 클러스터 전체 역할을 지우므로 `ALLOW_ROLE_TESTS=1` 이 있을 때만 돈다(운영과 같은 클러스터에서 비밀번호를 지우는 사고 방지) | 런북 §6·§7 |
 | D-159 | 부하 수치는 샌드박스(CPU 2개를 Postgres 와 공유) | ❓ | 141 rps · p95 192ms · 오류 0 은 동시 20개 기준. 대시보드 사용량(소수 동시 사용자)에는 충분하다고 [추정]. Mac 값은 다르다 | D-147 ⑤ |
 | D-160 | 변이 시험 도구와 CI | ✅ · ⏸ Step 11 | `scripts/mutation_api.py` 30건(약 5분, Postgres 필요)은 수동 실행. CI 에는 `tests/api`(DB 없는 부분 + Postgres 서비스 컨테이너)와 `export_openapi.py --check` 를 넣는다 | Step 11 |
+
+
+## J. Step 10 (대시보드 + Tableau) — 11-05
+
+모든 항목은 **샌드박스(Python 3.12 venv · 가짜 API · 헤드리스 Chrome 화면 확인)에서만 검증**했다. 실제 API·DB 데이터, Docker 이미지 빌드·기동, Mac 실측은 확인 전이다. 결정: `docs/adr/0012-step10-dashboard.md`, 실행: `docs/runbooks/step10-dashboard.md`.
+번호: 이 장은 D-165 부터. **D-162·D-164 는 이번 채팅의 HANDOFF 에 정의가 없어 여기서 정의하지 못했다**(아래 줄 참고).
+
+| ID | 항목 | 상태 | 현재 알려진 것 | 확인 방법 / 어디에 |
+|---|---|---|---|---|
+| D-161 | Tableau Public + API 기반 CSV(HANDOFF 기록) | ✅ 결정 → 옵션 A 구현 | 사용자 선택(옵션 A): 로컬 CSV 생성만, 게시는 사용자가 직접. `scripts/export_tableau.py` | ADR D10-8, `tableau/README.md` |
+| D-162 | (HANDOFF 에 정의 없음) | ❓ 사용자 기억 필요 | 이번 채팅에서 내용을 확인하지 못했다 — 추측해서 채우지 않는다 | 사용자가 내용을 알려 주면 여기에 기록 |
+| D-163 | git push | 👤 | HANDOFF 기록대로(D-71 과 함께) 사용자 작업. `.gitignore` 로 `.env`·`data/`·`tableau/export/` 가 빠지는지는 시험으로 확인 | `git status` 로 `.env` 가 안 보이는지 확인 후 push |
+| D-164 | (HANDOFF 에 정의 없음) | ❓ 사용자 기억 필요 | D-162 와 같음 | 같음 |
+| D-165 | Mac 에서 확인할 것(대시보드 7) | 👤 | ① `scripts/stack.sh init-env` 가 `API_KEYS` 끝에 `DASHBOARD_API_KEY` 를 덧붙이고 두 번째 실행은 "변경 없음" ② `scripts/stack.sh up-dashboard` 이미지 빌드(python:3.12-slim-bookworm, `streamlit==1.66.1` 휠)·healthy ③ **읽기 전용 파일시스템에서 Streamlit 기동**(`HOME=/tmp`, tmpfs `/tmp`) — 컨테이너로는 시험하지 못했다 ④ Compose v2.10.2 에서 `dashboard` 서비스 ⑤ `docker stats` 메모리 — 한도 `DASHBOARD_MEM_LIMIT` 기본 512m 는 **[추정]** ⑥ 실제 API 로 7개 화면 열기, 사이드바 "API 호출(최근 1분)" ≤12 ⑦ `python scripts/export_tableau.py --preview` | `docs/runbooks/step10-dashboard.md` §1~5 |
+| D-176 | Mac 실측 발견: 버스 `route_id` 필수(11-06) | ✅ 수정 | 지도·버스 화면과 `export_tableau.py` 가 HTTP 422 `validation_error` 로 실패 → 원인은 API 가 `route_id` 를 필수로 요구하는데 대시보드가 안 보낸 것(내 버그). `DASHBOARD_BUS_ROUTE_ID`(기본 753번)로 수정, 가짜 API 가 스냅샷대로 검증하게 강화, 변이 3건 추가. **교훈:** 계약 시험이 필드 이름뿐 아니라 필수 매개변수도 대조해야 한다 | ADR D10-10 |
+| D-177 | 노선이 1개로 고정 | ⏸ | API 에 노선 목록 엔드포인트가 없어 노선을 화면에서 고를 수 없다. 환경 변수로만 바꾼다 | 노선을 늘리면 `/v1` 에 목록 엔드포인트 추가 |
+| D-178 | 날씨 효과 비율 1.0 (해결) | ✅ | 기준선(`mv_link_baseline`)이 비교 대상 날 자신을 포함해, 수집 기간이 짧으면 비율이 항상 1.0 이었다. `sufficient` 에 `기준선 n_days >= 2`(`WEATHER_MIN_BASELINE_DAYS`) 추가 → 지금은 날씨 화면이 "표본 부족"으로 보이는 게 정상. 기준선에서 비교 날을 빼는 것(leave-one-out)은 아님 | 수집 2주 이상 쌓이면 자연히 채워짐. 근본 개선은 비교 날 제외 기준선 |
+| D-179 | 돌발 유형 코드표 일부만 앎 | ⏸ | 화면·CSV 가 A01 사고·A04 공사·작업·A10 행사·통제·A11 기타 4개만 한글로 보임. 그 밖의 코드는 "미확인 코드 (Axx)". CSV 는 코드(`acc_type`)와 한글(`acc_type_label`) 열을 둘 다 가짐 | 서울시 돌발 코드표 확인(api-catalog 의 `acc_type` 체크리스트와 동일) |
+| D-180 | 2026 공휴일 시드는 웹 자료 기준 | ⏸ | `sql/014_holidays_2026.sql`(마이그레이션) + `dashboard/holidays.py` 가 같은 20일 목록(시험이 대조). **인사혁신처 고시와 대조 전 [미확인]**. 2027년 이후는 비어 있어 평일/토/일로 계산. 마이그레이션이 `is_holiday` 를 바꾸므로 `congestion_threshold` 는 다음 재계산부터 `day_type='holiday'` 행을 만들 수 있음 | 공공데이터 특일 정보 승인(D-74, D-101) 후 `reference_data_sync` 로 대체 |
+| D-166 | 화면을 눈으로 본 것은 샌드박스 스크린샷뿐(→ 11-06 Mac 에서 개요·혼잡·돌발·날씨·이상·건강 실화면 캡처 확인, 지도·버스는 D-176 수정 후 재확인 필요) | ❓ | 가짜 데이터로 7개 화면을 헤드리스 Chrome 으로 찍어 레이아웃·글자 겹침을 확인했다. 실제 데이터(링크 4개·판정 불가 위주)에서의 모양, 모바일 폭, 다크 모드는 확인하지 않았다 | Mac 브라우저에서 확인, 어색하면 알려 주기 |
+| D-167 | 지도 바탕 타일은 브라우저가 인터넷으로 받는다 | ⏸ | pydeck 의 carto 밝은 바탕. 오프라인이면 점·선만 보인다(샌드박스 스크린샷이 그 상태). 대시보드 서버는 외부로 나가지 않는다 | 오프라인 지도가 필요하면 단색 바탕 옵션 추가 |
+| D-168 | 신선도(stale) 판정은 캐시 수명만큼 늦을 수 있다 | ✅ 설계 | 신선도는 API `meta.stale` 이 기준(null 이면 판정 안 함), 나이만 지금−as_of 로 다시 계산한다. 캐시(gold 5분·mart 15분) 때문에 stale 로 바뀌는 순간이 그만큼 늦다 | 더 빠르게 하려면 `DASHBOARD_TTL_SCALE` 을 줄인다(호출 예산과 맞바꿈) |
+| D-169 | 요일 구분은 근사(공휴일 → 평일) | ⏸ | 시계열에 기준선을 붙일 때·내보내기의 `day_type_guess` 는 평일/토/일만 구분한다. API 는 날짜→day_type 표를 주지 않는다. 공휴일에는 기준선이 어긋날 수 있다(화면에 표시) | API 에 날짜별 day_type 을 추가하면 정확해진다(`/v1` 추가 필드) |
+| D-170 | Tableau Public 게시 — 약관·공개 범위·원천 데이터 이용 조건 | ❓ 👤 | **확인하지 못했다.** Tableau Public 게시물은 누구나 볼 수 있고 비공개 옵션이 없다는 점은 알려져 있으나 현재 약관·한도는 직접 확인하지 않았다. 서울 열린데이터광장·공공데이터포털 이용 조건(출처 표시·재배포)도 미확인 | 사용자가 직접 확인 후 게시. 점검표는 `tableau/export/manifest.json` |
+| D-171 | 버스 드리프트 CSV 는 시간 단위 그대로 | ✅ 설계 | 일 단위로 다시 집계하면 백분위(p50·p90)를 평균 내게 되어 틀린다 → 마트 값을 시간 단위 그대로 내보낸다 | ADR D10-8 |
+| D-172 | 내보내기는 로컬 API 만 | ✅ 설계 | `127.0.0.1`/`localhost` 외 주소는 거부(키가 다른 곳으로 가지 않게) | — |
+| D-173 | 대시보드 시험은 가짜 API 기반 | ⏸ | 실제 Postgres 와 연결한 end-to-end 는 샌드박스에 PostGIS 가 없어 못 했다. 계약 시험이 대시보드가 읽는 필드를 OpenAPI 스냅샷과 대조해 어긋남은 막지만, 값의 의미는 Mac 에서 눈으로 확인해야 한다 | D-165 ⑥ |
+| D-174 | 변이 시험 31건·CI | ✅ · ⏸ Step 11 | `scripts/mutation_dashboard.py` 는 Postgres·Docker 없이 약 15초. CI 에 `tests/dashboard`·`tests/unit` 과 함께 넣는다 | Step 11 |
+| D-175 | 대시보드 의존성 고정 | ⏸ | `requirements-dashboard.txt` 는 샌드박스에서 시험한 정확한 버전(streamlit 1.66.1, pandas 3.1.1, pydeck 0.9.3, altair 6.3.0, requests 2.34.2). Streamlit 은 Python ≥3.11 필요. 올릴 때 `tests/dashboard` 통과 확인. `httpx2` 경고(D-156)는 그대로 | 다음 의존성 점검 |

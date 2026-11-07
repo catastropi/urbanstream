@@ -115,9 +115,10 @@ def test_weather_traffic_ratio_classes_sufficiency_and_idempotency(pg):
     for i in range(5):
         _speed(pg, f"h8-{i}", "L1", MON2 + timedelta(minutes=i * 5), 20.0)              # 08시: 비율 0.5
         _speed(pg, f"h9-{i}", "L1", MON2 + timedelta(hours=1, minutes=i * 5), 40.0)     # 09시: 비율 1.0
-    for h in (10, 11, 12, 13, 14):                                                       # 날씨 등급 확인용 (이 관측이 스스로 기준선이 되어 비율 1.0 — 기준선이 같은 기간을 포함하는 성질, D-111)
+    for h in (10, 11, 12, 13, 14):                                                       # 날씨 등급 확인용: 지난주(MON1)에도 같은 속도 → 기준선 2일, 비율 1.0
         for i in range(3):
             _speed(pg, f"x{h}-{i}", "L1", MON2 + timedelta(hours=h - 8, minutes=i), 30.0)
+            _speed(pg, f"y{h}-{i}", "L1", MON1 + timedelta(hours=h - 8, minutes=i), 30.0)
     _refresh(pg)
     _wx(pg, MON2, 12.0, 1)                                    # heavy
     _wx(pg, MON2 + timedelta(hours=1), 0.0, 0)                # none
@@ -138,6 +139,21 @@ def test_weather_traffic_ratio_classes_sufficiency_and_idempotency(pg):
     assert pg.execute("SELECT count(*) FROM mart.weather_traffic_hourly").fetchone()[0] == 7
     with pytest.raises(ValueError):
         M.build_weather_traffic(date(2026, 11, 10), d, connect=conn_of(pg))
+
+
+def test_weather_ratio_is_not_sufficient_when_baseline_is_a_single_day(pg):
+    """기준선이 비교 대상 날 하나뿐이면 비율은 항상 1.0(자기 자신과 비교)이다 → sufficient=false (D-178)."""
+    _link(pg, "L1")
+    for i in range(5):
+        _speed(pg, f"s{i}", "L1", MON2 + timedelta(minutes=i * 5), 33.0)
+    _refresh(pg)
+    _wx(pg, MON2, 0.0, 0)
+    d = date(2026, 11, 9)
+    out = M.build_weather_traffic(d, d, connect=conn_of(pg))
+    r = pg.execute("SELECT ratio, sufficient FROM mart.weather_traffic_hourly").fetchone()
+    assert r[0] == 1.0 and r[1] is False and out["sufficient"] == 0
+    M.build_weather_traffic(d, d, min_baseline_days=1, connect=conn_of(pg))              # 기준을 낮추면 다시 충분 → 조건이 실제로 작동
+    assert pg.execute("SELECT sufficient FROM mart.weather_traffic_hourly").fetchone()[0] is True
 
 
 # ------------------------------------------------------------------ 창고 관리

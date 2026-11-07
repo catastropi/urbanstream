@@ -16,6 +16,7 @@ PostgreSQL 17 + PostGIS DDL. **번호 순서 마이그레이션**이며 `scripts
 | 010_dq.sql | Step 8b: `ops.dq_result` + `v_dq_latest`·`v_dq_summary` |
 | 011_anomaly.sql | Step 8c: `mart.anomaly_event` + `v_anomaly_recent` |
 | 012_grant_mart_views.sql | Mac 에서 발견: `gold_writer` 가 mart 뷰를 읽지 못해 DQ 규칙 1개가 실패 → 기존 mart 뷰 전부 SELECT 부여 |
+| 014_holidays_2026.sql | 2026 공휴일 20일 시드 `is_holiday`(웹 자료 기준 [미확인], D-180) |
 
 규칙: 이미 적용된 파일은 **수정하지 않는다**(체크섬 검사로 중단). 고칠 때는 다음 번호 파일을 추가한다.
 `initdb.d` 는 쓰지 않는다. 이미 떠 있는 DB 에도 같은 명령으로 적용된다.

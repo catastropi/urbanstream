@@ -192,6 +192,7 @@ INCIDENT_MATCH_RADIUS_M = 300.0         # 돌발 → 수집 링크 거리 상한
 INCIDENT_PRE_MINUTES = 60               # 돌발 직전 비교 구간
 INCIDENT_MIN_OBS = 3                    # 구간 안/직전 속도 관측 최소 수
 WEATHER_MIN_SPEED_OBS = 3               # 시간당 속도 관측 최소 수
+WEATHER_MIN_BASELINE_DAYS = 2           # 기준선이 서로 다른 날 2일 이상이어야 '비교'다 (1일이면 비교 대상 날 자신 = 비율 1.0, D-178)
 RAIN_LIGHT_MAX_MM = 1.0                 # rn1 < 1 → light
 RAIN_HEAVY_MIN_MM = 10.0                # rn1 >= 10 → heavy
 SNOW_MIX_PTY = (2, 3, 6, 7)             # 비/눈, 눈, 빗방울/눈날림, 눈날림 (기상청 초단기실황 PTY 코드, [추정] 코드표 기준)
@@ -284,6 +285,7 @@ def build_incident_impact(*, as_of=None, finalize_after_hours: float = INCIDENT_
 
 
 def build_weather_traffic(d0: date, d1: date, *, min_speed_obs: int = WEATHER_MIN_SPEED_OBS,
+                          min_baseline_days: int = WEATHER_MIN_BASELINE_DAYS,
                           light_max: float = RAIN_LIGHT_MAX_MM, heavy_min: float = RAIN_HEAVY_MIN_MM,
                           connect: Optional[Callable[[], Any]] = None) -> dict:
     """링크 × KST 시각의 속도 비율(기준선 대비)에 같은 시각 날씨를 붙인다. d0~d1(KST 날짜) 를 지우고 다시 넣는다."""
@@ -315,7 +317,7 @@ def build_weather_traffic(d0: date, d1: date, *, min_speed_obs: int = WEATHER_MI
                 (link_id, kst_date, kst_hour, n_speed, speed_p50, baseline_p50, ratio, rn1, pty, t1h, precip_class, sufficient, provisional)
             SELECT s.link_id, s.kst_date, s.kst_hour, s.n, s.p50, b.speed_p50,
                    s.p50 / nullif(b.speed_p50, 0), x.rn1, x.pty, x.t1h, pc.cls,
-                   coalesce(s.n >= %(minn)s AND b.speed_p50 > 0 AND pc.cls IS NOT NULL, false),   -- 기준선이 없으면 NULL → false
+                   coalesce(s.n >= %(minn)s AND b.speed_p50 > 0 AND b.n_days >= %(mind)s AND pc.cls IS NOT NULL, false),   -- 기준선이 없거나 1일뿐이면 false
                    coalesce(b.provisional, true)
             FROM spd s
             LEFT JOIN dim.dim_date d ON d.date_key = s.kst_date
@@ -328,7 +330,7 @@ def build_weather_traffic(d0: date, d1: date, *, min_speed_obs: int = WEATHER_MI
                     WHEN x.rn1 >= %(light)s THEN 'moderate'
                     WHEN x.rn1 > 0 OR coalesce(x.pty, 0) > 0 THEN 'light'
                     ELSE 'none' END AS cls) pc
-            """, {"d0": d0, "d1": d1, "minn": min_speed_obs, "light": light_max, "heavy": heavy_min,
+            """, {"d0": d0, "d1": d1, "minn": min_speed_obs, "mind": min_baseline_days, "light": light_max, "heavy": heavy_min,
                   "snow": [float(v) for v in SNOW_MIX_PTY]})
         n = cur.rowcount
         s = conn.execute("SELECT count(*) FILTER (WHERE sufficient), count(*) FILTER (WHERE precip_class IS NULL) "

@@ -6,6 +6,9 @@ import re
 from pathlib import Path
 
 import pytest
+
+# 기본 환경에 fastapi 가 없으면 수집 오류 대신 건너뛴다(설치: pip install -r requirements-api.txt)
+pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 
 from api.config import load_settings

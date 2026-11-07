@@ -27,3 +27,8 @@ def test_nested_data_files_and_env_are_ignored_but_gitkeep_is_not(tmp_path):
     r = _ignored(tmp_path, ["data/bronze/seoul_traffic/event_date=2026-11-03/p.parquet", "data/reference/LINK_VERTEX_2025.xlsx",
                             "data/gold_stage/traffic_speed/p.parquet", "data/raw/a.gz", ".env", "data/silver/.gitkeep"])
     assert [k for k, v in r.items() if not v] == ["data/silver/.gitkeep"]
+
+
+def test_tableau_export_output_is_ignored(tmp_path):
+    r = _ignored(tmp_path, ["tableau/export/link_speed_hourly.csv", "tableau/export/manifest.json", "tableau/README.md"])
+    assert [k for k, v in r.items() if not v] == ["tableau/README.md"]
