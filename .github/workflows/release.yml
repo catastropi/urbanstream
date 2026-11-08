@@ -1,0 +1,61 @@
+# 릴리스 이미지 게시 (Step 11, ADR-0013 D11-8). 배포가 아니다 — 배포할 서버가 없고 스택은 사용자 Mac 의 compose 로 돈다.
+# 태그 v<major>.<minor>.<patch> 를 푸시할 때만 api·dashboard 이미지를 만들어 GHCR 에 올린다(linux/amd64). Airflow·Spark 이미지는 올리지 않는다(DEFERRED).
+# 쓰는 비밀은 GITHUB_TOKEN 뿐이고, 쓰기 권한(packages: write)은 이 job 에만 있다.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        image: [api, dashboard]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+      - name: 태그 형식 확인 (v1.2.3 만 허용)
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          case "$TAG" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo "태그는 v1.2.3 형식이어야 합니다: $TAG"; exit 1;; esac
+          echo "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || { echo "태그는 v1.2.3 형식이어야 합니다: $TAG"; exit 1; }
+      - name: 빌드
+        env:
+          NAME: ${{ matrix.image }}
+          TAG: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          OWNER_LC="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          IMG="ghcr.io/${OWNER_LC}/urbanstream-${NAME}"
+          docker build -f "docker/${NAME}/Dockerfile" \
+            --label "org.opencontainers.image.source=https://github.com/${REPO}" \
+            --label "org.opencontainers.image.revision=${SHA}" \
+            -t "${IMG}:${TAG#v}" -t "${IMG}:sha-${SHA::7}" .
+          echo "IMG=${IMG}" >> "$GITHUB_ENV"
+      - name: 이미지 검사 (.env·data·tests 없음, 비루트)
+        env:
+          TAG: ${{ github.ref_name }}
+        run: python scripts/ci_checks.py image-guard "${IMG}:${TAG#v}"
+      - name: GHCR 로그인 + 푸시
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker push "${IMG}:${TAG#v}"
+          docker push "${IMG}:sha-${SHA::7}"

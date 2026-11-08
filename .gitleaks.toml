@@ -1,0 +1,12 @@
+# Step 11 (ADR-0013 D11-3). 기본 규칙 + 아래 허용 목록. 허용 목록은 '왜 허용하는지'를 적고, 최소한으로 둔다.
+title = "urbanstream"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "비밀이 아닌 것"
+# 녹화한 API 응답 샘플: 서비스 키는 ***KEY*** 로 마스킹되어 있다(tests/fixtures/recorded/README.md)
+paths = ['''tests/fixtures/recorded/''']
+# CI 의 일회용 Postgres 비밀번호는 '비밀이 아님'을 이름에 적어 둔 더미 값이다(.github/workflows, scripts/ci_checks.py)
+regexes = ['''ci-not-a-secret''']

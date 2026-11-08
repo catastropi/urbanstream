@@ -1,0 +1,8 @@
+# 액션 버전/SHA 갱신 PR 만 받는다(주 1회). 파이썬 패키지는 시험을 돌려 보고 사람이 올리는 정책이라 자동 갱신하지 않는다(requirements-*.txt 머리말).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

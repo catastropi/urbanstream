@@ -184,7 +184,7 @@
 | D-157 | Compose 에서 `${API_KEYS:-}` (필수 `:?` 아님) | ✅ 설계 이탈 | 다른 서비스는 비밀을 `:?` 로 필수 처리하지만 `api` 만 그러면 `stack.sh ps/down/stats`(`--profile '*'`)가 API 키 없이 전부 실패한다. 대신 앱이 빈 키·비밀번호로 기동을 거부(fail-closed)하고 `up-api` 가 미리 안내. 시험: 정책 테스트·`docker compose config` | — |
 | D-158 | `api_service` 비밀번호는 `db_bootstrap.py --api` 로만 | ✅ 설계 | 013 은 NOLOGIN 으로 만들어 안전한 쪽으로 실패. 역할 시험(`test_api_role.py`)은 클러스터 전체 역할을 지우므로 `ALLOW_ROLE_TESTS=1` 이 있을 때만 돈다(운영과 같은 클러스터에서 비밀번호를 지우는 사고 방지) | 런북 §6·§7 |
 | D-159 | 부하 수치는 샌드박스(CPU 2개를 Postgres 와 공유) | ❓ | 141 rps · p95 192ms · 오류 0 은 동시 20개 기준. 대시보드 사용량(소수 동시 사용자)에는 충분하다고 [추정]. Mac 값은 다르다 | D-147 ⑤ |
-| D-160 | 변이 시험 도구와 CI | ✅ · ⏸ Step 11 | `scripts/mutation_api.py` 30건(약 5분, Postgres 필요)은 수동 실행. CI 에는 `tests/api`(DB 없는 부분 + Postgres 서비스 컨테이너)와 `export_openapi.py --check` 를 넣는다 | Step 11 |
+| D-160 | 변이 시험 도구와 CI | ✅ · ✅ Step 11 코드(CI 첫 실행 대기 D-189) | `scripts/mutation_api.py` 30건(약 5분, Postgres 필요)은 수동 실행. CI 에는 `tests/api`(DB 없는 부분 + Postgres 서비스 컨테이너)와 `export_openapi.py --check` 를 넣는다 | Step 11 |
 
 
 ## J. Step 10 (대시보드 + Tableau) — 11-05
@@ -211,6 +211,27 @@
 | D-170 | Tableau Public 게시 — 약관·공개 범위·원천 데이터 이용 조건 | ❓ 👤 | **확인하지 못했다.** Tableau Public 게시물은 누구나 볼 수 있고 비공개 옵션이 없다는 점은 알려져 있으나 현재 약관·한도는 직접 확인하지 않았다. 서울 열린데이터광장·공공데이터포털 이용 조건(출처 표시·재배포)도 미확인 | 사용자가 직접 확인 후 게시. 점검표는 `tableau/export/manifest.json` |
 | D-171 | 버스 드리프트 CSV 는 시간 단위 그대로 | ✅ 설계 | 일 단위로 다시 집계하면 백분위(p50·p90)를 평균 내게 되어 틀린다 → 마트 값을 시간 단위 그대로 내보낸다 | ADR D10-8 |
 | D-172 | 내보내기는 로컬 API 만 | ✅ 설계 | `127.0.0.1`/`localhost` 외 주소는 거부(키가 다른 곳으로 가지 않게) | — |
-| D-173 | 대시보드 시험은 가짜 API 기반 | ⏸ | 실제 Postgres 와 연결한 end-to-end 는 샌드박스에 PostGIS 가 없어 못 했다. 계약 시험이 대시보드가 읽는 필드를 OpenAPI 스냅샷과 대조해 어긋남은 막지만, 값의 의미는 Mac 에서 눈으로 확인해야 한다 | D-165 ⑥ |
-| D-174 | 변이 시험 31건·CI | ✅ · ⏸ Step 11 | `scripts/mutation_dashboard.py` 는 Postgres·Docker 없이 약 15초. CI 에 `tests/dashboard`·`tests/unit` 과 함께 넣는다 | Step 11 |
+| D-173 | 대시보드 시험은 가짜 API 기반 | ⏸ 일부 해소(Step 11 e2e `tests/e2e/test_api_dashboard_pg.py`, 샌드박스 PG16) | 실제 Postgres 와 연결한 end-to-end 는 샌드박스에 PostGIS 가 없어 못 했다. 계약 시험이 대시보드가 읽는 필드를 OpenAPI 스냅샷과 대조해 어긋남은 막지만, 값의 의미는 Mac 에서 눈으로 확인해야 한다 | D-165 ⑥ |
+| D-174 | 변이 시험 33건(원래 31이라 적었으나 실제 33)·CI | ✅ · ✅ Step 11 코드(CI 첫 실행 대기 D-189) | `scripts/mutation_dashboard.py` 는 Postgres·Docker 없이 약 15초. CI 에 `tests/dashboard`·`tests/unit` 과 함께 넣는다 | Step 11 |
 | D-175 | 대시보드 의존성 고정 | ⏸ | `requirements-dashboard.txt` 는 샌드박스에서 시험한 정확한 버전(streamlit 1.66.1, pandas 3.1.1, pydeck 0.9.3, altair 6.3.0, requests 2.34.2). Streamlit 은 Python ≥3.11 필요. 올릴 때 `tests/dashboard` 통과 확인. `httpx2` 경고(D-156)는 그대로 | 다음 의존성 점검 |
+
+
+## K. Step 11 (시험 계층 + GitHub Actions CI/CD) — 11-08
+
+**워크플로는 샌드박스에서 실행할 수 없어서 GitHub 에서 한 번도 돌려 보지 못했다.** 확인한 것은 도구·시험·정적 점검뿐이다(814 passed / 3 skipped, 변이 `mutation_ci` 35 · `mutation_dashboard` 33 · `mutation_api` 30 전부 검출). 결정: `docs/adr/0013-step11-ci-cd.md`, 실행: `docs/runbooks/step11-ci.md`.
+번호: 이 장은 D-183 부터 (D-181·D-182 는 사용자 소유 항목으로 이 장 밖).
+
+| ID | 항목 | 상태 | 현재 알려진 것 | 확인 방법 / 어디에 |
+|---|---|---|---|---|
+| D-183 | 액션이 SHA 가 아니라 `@vN` 태그 | 👤 | 승인된 결정 9(SHA 고정)와 다름. 샌드박스가 github.com 태그→SHA 를 조회하지 못해 지어내지 않았다. 도구 `scripts/pin_actions.py`(`--check` 로 현황). Dependabot 이 주 1회 갱신 PR | 런북 1단계 |
+| D-184 | gitleaks 핀(`.github/gitleaks.pin`)이 없다 | 👤 🔴 | 핀이 없으면 `secrets` job 이 **일부러 실패**(fail-closed). `scripts/pin_gitleaks.py` 가 버전·sha256 을 기록. 샌드박스는 릴리스/체크섬을 조회하지 못함 | 런북 1단계, push 전 |
+| D-185 | 실제 GitHub Actions 실행 전부 | ❓ 👤 | job 10+5+1개 모두 미실행. 가정: PG 서비스 컨테이너 헬스체크, Airflow 3.3.0 + constraints-3.12 설치, docker build 컨텍스트, `${GITHUB_REPOSITORY_OWNER}` 소문자 변환, 태그 형식 검사 | 첫 push 후 Actions 결과. 로그 마지막 20줄 |
+| D-186 | CI/CD 범위 밖으로 둔 것 | ⏸ | ① Kafka→Spark→Gold 전체 e2e(비용 큼) ② Airflow·Spark 이미지는 CI 빌드·GHCR 게시 안 함 ③ arm64 이미지 없음(Mac 은 로컬 빌드) ④ Trivy/SBOM/이미지 서명 없음 ⑤ 배포(서버 없음) | 필요해질 때 ADR |
+| D-187 | `api-contract-watch`(실제 공공 API 주기 호출로 응답 모양 변화 감시) | ⏸ | 하지 않음: 실제 키를 CI Secrets 에 넣어야 하고(결정 2 와 충돌), 호출 한도를 쓴다. 대안: 수집기가 이미 `rejects`·스키마 위반을 감사 로그에 남긴다 | 키를 CI 에 둘 의사가 생기면 별도 결정 |
+| D-188 | Actions 사용량(분) | ❓ 👤 | PR 1회 약 40~60분 [추정] — 실제는 첫 실행 후 Settings → Billing. private Free 2,000분/월 | 첫 초록불 뒤 확인, 분이 모자라면 ADR "비용과 시간" 의 3가지 |
+| D-189 | CI 첫 초록불로 닫을 수 있는 것 | 👤 | D-181(PG17/PostGIS 3.6.1 에서 시험), D-160·D-174(CI 반영 완료 확인) | `test-pg`·`test-core` 초록불 |
+| D-190 | Spark 컨테이너 시험이 새 `pytest.ini`(`-p layers_plugin`)로 도는지 | ❓ 👤 | 샌드박스에서는 pyspark 4.1.3 로 통과. 컨테이너는 `tests/support` 를 `pythonpath` 로 이미 쓰므로 괜찮다고 [추정] | 이미지 재빌드 후 `scripts/spark_test.sh` |
+| D-191 | PostGIS 이미지의 linux/amd64 매니페스트 | ❓ | Mac(arm64)에서는 arm64 항목을 확인했으나 러너는 amd64. `imresamu/postgis` 가 amd64 도 제공한다고 [추정] — 모르면 `test-pg` 의 서비스 시작 단계에서 바로 실패로 드러남 | 첫 실행 |
+| D-192 | 실제 docker 빌드·이미지 검사(`image-guard`) | ❓ | 샌드박스에는 docker CLI 만 있고 데몬/레지스트리 접근이 없다. 검사 로직은 단위 시험(목록·사용자 판정)으로만 확인 | 첫 실행의 `docker-build` job |
+| D-193 | 브랜치 보호 | 👤 ⏸ | 선택. 필수 체크는 `ci-ok` 하나. private Free 플랜에서의 지원 여부 [미확인] | 런북 5단계 |
+| D-194 | 저장소를 public 으로 바꿀지 | ❓ 👤 | 분은 무제한이 되지만 코드·이력이 공개된다. 먼저 주간 `secrets-full`(전체 이력 스캔) 통과와 D-71(데이터 파일 이력) 확인 필요 | 포트폴리오 공개 단계 |

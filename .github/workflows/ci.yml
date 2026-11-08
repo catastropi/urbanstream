@@ -1,0 +1,228 @@
+# UrbanStream CI (Step 11, ADR-0013). 실제 API 키·비밀을 쓰지 않는다 — 쓰는 비밀은 자동 발급되는 GITHUB_TOKEN 뿐(여기서는 그마저 읽기 전용).
+# 무거운 job(mutation-api, dags, docker-build)은 관련 파일이 바뀌었을 때만 돈다(scripts/ci_changes.py — 모르면 돌린다).
+# 로컬에서 같은 일을 하는 방법은 docs/runbooks/step11-ci.md.
+name: ci
+
+on:
+  pull_request:
+    paths-ignore: ["docs/**", "**/*.md"]
+  push:
+    branches: [main]
+    paths-ignore: ["docs/**", "**/*.md"]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      api: ${{ steps.c.outputs.api }}
+      dags: ${{ steps.c.outputs.dags }}
+      docker: ${{ steps.c.outputs.docker }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+      - id: c
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.sha }}
+        run: python3 scripts/ci_changes.py --base "$BASE" --head "$HEAD"
+
+  hygiene:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - name: 도구 설치 (ruff 는 버전 고정)
+        run: pip install ruff==0.16.9 -r requirements-api.txt
+      - name: ruff — 치명 오류만 (ruff.toml)
+        run: ruff check .
+      - name: 추적 금지 파일 (.env · data/ 실파일 · 내보내기 CSV · 캐시)
+        run: python scripts/ci_checks.py tracked
+      - name: docker compose config (더미 환경 파일, 전체 프로파일)
+        run: python scripts/ci_checks.py compose
+      - name: OpenAPI 스냅샷이 코드와 같은지
+        run: python scripts/export_openapi.py --check
+
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+      - name: gitleaks (버전·체크섬 고정, 변경분만)
+        env:
+          RANGE: ${{ github.event.pull_request.base.sha || github.event.before }}..${{ github.sha }}
+        run: python3 scripts/ci_gitleaks.py scan --mode diff --range "$RANGE"
+
+  test-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements-dev.txt -r requirements-dashboard.txt
+      - name: unit
+        run: python -m pytest -q -m unit
+      - name: contract
+        run: python -m pytest -q -m contract
+      - name: recovery
+        run: python -m pytest -q -m recovery
+      - name: api (DB 없는 부분)
+        run: python -m pytest -q -m api
+      - name: dashboard (AppTest 포함)
+        run: python -m pytest -q -m dashboard
+      - name: 대시보드 변이 시험 (코드를 일부러 깨서 시험이 잡는지)
+        run: python scripts/mutation_dashboard.py
+
+  test-minimal:
+    # Mac 기본 환경(requirements.txt + pytest 만; fastapi·streamlit 없음)에서도 실패 0 인지 — Step 10 의 importorskip 약속을 지킨다.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements.txt pytest
+      - run: python -m pytest -q
+
+  test-pg:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: imresamu/postgis:17-3.6.1-bookworm
+        env:
+          POSTGRES_PASSWORD: ci-not-a-secret
+          POSTGRES_DB: ut_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ut_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # 일회용 DB 라 스키마를 지우는 시험과 클러스터 역할을 지우는 시험(ALLOW_ROLE_TESTS)을 켜도 안전하다.
+      GOLD_TEST_DSN: host=127.0.0.1 port=5432 dbname=ut_test user=postgres password=ci-not-a-secret
+      ALLOW_ROLE_TESTS: "1"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements-dev.txt -r requirements-dashboard.txt
+      - name: 전체 시험 (Spark 제외) — integration · data · api · dashboard · e2e
+        run: python -m pytest -q -m "not spark" --durations=10
+
+  mutation-api:
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: imresamu/postgis:17-3.6.1-bookworm
+        env:
+          POSTGRES_PASSWORD: ci-not-a-secret
+          POSTGRES_DB: ut_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ut_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      GOLD_TEST_DSN: host=127.0.0.1 port=5432 dbname=ut_test user=postgres password=ci-not-a-secret
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - name: API 변이 시험 30건
+        run: python scripts/mutation_api.py
+
+  dags:
+    needs: changes
+    if: needs.changes.outputs.dags == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - name: Airflow 3.3.0 (공식 constraints 로 의존성 고정) + 시험 도구
+        run: pip install "apache-airflow==3.3.0" --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-3.3.0/constraints-3.12.txt" -r requirements-dev.txt
+      - name: DAG 파싱·운영 정책 시험
+        run: python -m pytest -q tests/unit/test_dags_parse.py
+
+  docker-build:
+    needs: changes
+    if: needs.changes.outputs.docker == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+      - name: api 이미지 빌드 (푸시하지 않음)
+        run: docker build -f docker/api/Dockerfile -t urbanstream/api:ci .
+      - name: api 이미지 검사 (.env·data·tests 없음, 비루트) + import 연기 시험
+        run: |
+          python scripts/ci_checks.py image-guard urbanstream/api:ci
+          docker run --rm --entrypoint python urbanstream/api:ci -c "import api.main"
+      - name: dashboard 이미지 빌드 (푸시하지 않음)
+        run: docker build -f docker/dashboard/Dockerfile -t urbanstream/dashboard:ci .
+      - name: dashboard 이미지 검사 + import 연기 시험
+        run: |
+          python scripts/ci_checks.py image-guard urbanstream/dashboard:ci
+          docker run --rm --entrypoint python urbanstream/dashboard:ci -c "import dashboard.client, dashboard.contract"
+
+  ci-ok:
+    # 브랜치 보호를 켠다면 이 job 하나만 '필수 검사'로 지정하면 된다. 건너뛴 job(skipped)은 통과로 본다.
+    if: always()
+    needs: [changes, hygiene, secrets, test-core, test-minimal, test-pg, mutation-api, dags, docker-build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 실패·취소가 하나라도 있으면 실패
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "결과: $RESULTS"
+          case " $RESULTS " in *" failure "*|*" cancelled "*) exit 1;; esac
