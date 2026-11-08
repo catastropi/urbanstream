@@ -186,7 +186,7 @@ jobs:
           cache: pip
           cache-dependency-path: requirements*.txt
       - name: Airflow 3.3.0 (공식 constraints 로 의존성 고정) + 시험 도구
-        run: pip install "apache-airflow==3.3.0" --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-3.3.0/constraints-3.12.txt" -r requirements-dev.txt
+        run: pip install "apache-airflow==3.3.0" --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-3.3.0/constraints-3.12.txt" -r requirements.txt pytest
       - name: DAG 파싱·운영 정책 시험
         run: python -m pytest -q tests/unit/test_dags_parse.py
 
