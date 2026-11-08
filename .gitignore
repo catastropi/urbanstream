@@ -11,3 +11,7 @@ data/**
 
 # Step 10: Tableau 용 CSV 추출물(scripts/export_tableau.py). 재생성 가능하고 공개 게시 전 사용자가 직접 검토하므로 git 에 올리지 않는다.
 tableau/export/
+
+# 환경 파일 백업 (Step 11)
+.env.*
+!.env.example
