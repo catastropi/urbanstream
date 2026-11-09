@@ -56,3 +56,11 @@ def test_mutation_runners_copy_tests_support():
     for name in ("mutation_api.py", "mutation_dashboard.py"):
         text = (ROOT / "scripts" / name).read_text(encoding="utf-8")
         assert "tests/support" in text and "pytest.ini" in text, name
+
+
+def test_container_pytest_wrapper_works_with_the_old_system_pytest():
+    """Spark 이미지의 pytest 는 시스템 패키지(구버전)다: pytest.ini 의 `pythonpath` 를 무시하고(Unknown config option),
+    `-p layers_plugin` 은 PYTHONPATH 적용 전에 import 하려다 실패한다(11-09 Mac 의 spark_test.sh 실제 실패 2건)."""
+    w = (ROOT / "docker" / "spark-base" / "urbanstream-pytest.sh").read_text(encoding="utf-8")
+    assert "/app/tests/support" in w, "pg_support import 가 구버전 pytest 에서 실패한다"
+    assert "-o addopts=" in w, "-p layers_plugin 이 구버전 pytest 에서 import 실패한다"

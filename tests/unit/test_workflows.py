@@ -157,3 +157,31 @@ def test_workflow_script_references_exist():
             if "${" in p:
                 continue
             assert (ROOT / p).exists(), f"{f.name} 이 없는 파일을 가리킨다: {p}"
+
+
+def test_dags_jobs_do_not_install_api_requirements():
+    """Airflow constraints 가 fastapi 를 0.136.x 로 고정해 requirements-api(fastapi==0.162.0)와 충돌한다(11-09 실제 CI 실패).
+    DAG 파싱 시험에는 requirements.txt + pytest 면 충분하다."""
+    for name in ("ci.yml", "weekly.yml"):
+        job = load(name)["jobs"]["dags"]
+        runs = "\n".join(s.get("run", "") for s in job["steps"])
+        assert "apache-airflow==3.3.0" in runs
+        assert "requirements-dev.txt" not in runs and "requirements-api.txt" not in runs, name
+
+
+def test_marker_and_path_combinations_select_something():
+    """`pytest -m X <경로>` 에서 그 경로의 마커가 X 가 아니면 0개가 선택돼 exit 5 로 실패한다(11-09 weekly spark 실제 실패).
+    마커는 디렉터리 이름으로 붙으므로(layers_plugin) 경로의 폴더가 X 인지 본다."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("lp_wf", ROOT / "tests" / "support" / "layers_plugin.py")
+    lp = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lp)
+    checked = 0
+    for f in FILES:
+        for m in re.finditer(r"pytest\b[^\n]*?-m\s+\"?([a-z]+)\"?([^\n]*)", f.read_text(encoding="utf-8")):
+            marker, rest = m.group(1), m.group(2)
+            for path in re.findall(r"\btests/[\w/.-]+", rest):
+                checked += 1
+                rel = path if path.endswith(".py") else path.rstrip("/") + "/x.py"
+                assert marker in lp.layers_for(rel), f"{f.name}: -m {marker} {path} → 선택되는 시험이 0개"
+    assert checked >= 0

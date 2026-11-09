@@ -184,7 +184,7 @@
 | D-157 | Compose 에서 `${API_KEYS:-}` (필수 `:?` 아님) | ✅ 설계 이탈 | 다른 서비스는 비밀을 `:?` 로 필수 처리하지만 `api` 만 그러면 `stack.sh ps/down/stats`(`--profile '*'`)가 API 키 없이 전부 실패한다. 대신 앱이 빈 키·비밀번호로 기동을 거부(fail-closed)하고 `up-api` 가 미리 안내. 시험: 정책 테스트·`docker compose config` | — |
 | D-158 | `api_service` 비밀번호는 `db_bootstrap.py --api` 로만 | ✅ 설계 | 013 은 NOLOGIN 으로 만들어 안전한 쪽으로 실패. 역할 시험(`test_api_role.py`)은 클러스터 전체 역할을 지우므로 `ALLOW_ROLE_TESTS=1` 이 있을 때만 돈다(운영과 같은 클러스터에서 비밀번호를 지우는 사고 방지) | 런북 §6·§7 |
 | D-159 | 부하 수치는 샌드박스(CPU 2개를 Postgres 와 공유) | ❓ | 141 rps · p95 192ms · 오류 0 은 동시 20개 기준. 대시보드 사용량(소수 동시 사용자)에는 충분하다고 [추정]. Mac 값은 다르다 | D-147 ⑤ |
-| D-160 | 변이 시험 도구와 CI | ✅ · ✅ Step 11 코드(CI 첫 실행 대기 D-189) | `scripts/mutation_api.py` 30건(약 5분, Postgres 필요)은 수동 실행. CI 에는 `tests/api`(DB 없는 부분 + Postgres 서비스 컨테이너)와 `export_openapi.py --check` 를 넣는다 | Step 11 |
+| D-160 | 변이 시험 도구와 CI | ✅ · ✅ Step 11 (CI 초록불 확인 11-09) | `scripts/mutation_api.py` 30건(약 5분, Postgres 필요)은 수동 실행. CI 에는 `tests/api`(DB 없는 부분 + Postgres 서비스 컨테이너)와 `export_openapi.py --check` 를 넣는다 | Step 11 |
 
 
 ## J. Step 10 (대시보드 + Tableau) — 11-05
@@ -212,7 +212,7 @@
 | D-171 | 버스 드리프트 CSV 는 시간 단위 그대로 | ✅ 설계 | 일 단위로 다시 집계하면 백분위(p50·p90)를 평균 내게 되어 틀린다 → 마트 값을 시간 단위 그대로 내보낸다 | ADR D10-8 |
 | D-172 | 내보내기는 로컬 API 만 | ✅ 설계 | `127.0.0.1`/`localhost` 외 주소는 거부(키가 다른 곳으로 가지 않게) | — |
 | D-173 | 대시보드 시험은 가짜 API 기반 | ⏸ 일부 해소(Step 11 e2e `tests/e2e/test_api_dashboard_pg.py`, 샌드박스 PG16) | 실제 Postgres 와 연결한 end-to-end 는 샌드박스에 PostGIS 가 없어 못 했다. 계약 시험이 대시보드가 읽는 필드를 OpenAPI 스냅샷과 대조해 어긋남은 막지만, 값의 의미는 Mac 에서 눈으로 확인해야 한다 | D-165 ⑥ |
-| D-174 | 변이 시험 33건(원래 31이라 적었으나 실제 33)·CI | ✅ · ✅ Step 11 코드(CI 첫 실행 대기 D-189) | `scripts/mutation_dashboard.py` 는 Postgres·Docker 없이 약 15초. CI 에 `tests/dashboard`·`tests/unit` 과 함께 넣는다 | Step 11 |
+| D-174 | 변이 시험 33건(원래 31이라 적었으나 실제 33)·CI | ✅ · ✅ Step 11 (CI 초록불 확인 11-09) | `scripts/mutation_dashboard.py` 는 Postgres·Docker 없이 약 15초. CI 에 `tests/dashboard`·`tests/unit` 과 함께 넣는다 | Step 11 |
 | D-175 | 대시보드 의존성 고정 | ⏸ | `requirements-dashboard.txt` 는 샌드박스에서 시험한 정확한 버전(streamlit 1.66.1, pandas 3.1.1, pydeck 0.9.3, altair 6.3.0, requests 2.34.2). Streamlit 은 Python ≥3.11 필요. 올릴 때 `tests/dashboard` 통과 확인. `httpx2` 경고(D-156)는 그대로 | 다음 의존성 점검 |
 
 
@@ -223,15 +223,44 @@
 
 | ID | 항목 | 상태 | 현재 알려진 것 | 확인 방법 / 어디에 |
 |---|---|---|---|---|
-| D-183 | 액션이 SHA 가 아니라 `@vN` 태그 | 👤 | 승인된 결정 9(SHA 고정)와 다름. 샌드박스가 github.com 태그→SHA 를 조회하지 못해 지어내지 않았다. 도구 `scripts/pin_actions.py`(`--check` 로 현황). Dependabot 이 주 1회 갱신 PR | 런북 1단계 |
-| D-184 | gitleaks 핀(`.github/gitleaks.pin`)이 없다 | 👤 🔴 | 핀이 없으면 `secrets` job 이 **일부러 실패**(fail-closed). `scripts/pin_gitleaks.py` 가 버전·sha256 을 기록. 샌드박스는 릴리스/체크섬을 조회하지 못함 | 런북 1단계, push 전 |
-| D-185 | 실제 GitHub Actions 실행 전부 | ❓ 👤 | job 10+5+1개 모두 미실행. 가정: PG 서비스 컨테이너 헬스체크, Airflow 3.3.0 + constraints-3.12 설치, docker build 컨텍스트, `${GITHUB_REPOSITORY_OWNER}` 소문자 변환, 태그 형식 검사 | 첫 push 후 Actions 결과. 로그 마지막 20줄 |
+| D-183 | 액션 SHA 고정 | ✅ 11-09 | 사용자가 `scripts/pin_actions.py` 실행(ci 16·release 2·weekly 10개 고정). 이후 zip 을 다시 풀면 워크플로가 `@vN` 태그로 되돌아가므로 **unzip 뒤 `python scripts/pin_actions.py` 를 다시 실행**(이미 고정된 줄은 건드리지 않는다). Dependabot 이 갱신 PR 을 만든다 | 런북 1단계 |
+| D-184 | gitleaks 핀 | ✅ 11-09 | 사용자가 `scripts/pin_gitleaks.py` 실행 → 8.30.1 핀을 커밋. `secrets` job 은 첫 실행에서 통과 | — |
+| D-185 | 실제 GitHub Actions 실행 | ✅ 11-09 | **`ci`·`weekly`·`release` 세 워크플로 모두 초록불**(사용자 확인). 첫 실행에서 나온 오류는 전부 수정: `dags`(Airflow constraints 와 fastapi 고정 충돌), `weekly` spark(`-m spark` 로 unit 파일을 걸러 0개 선택, exit 5), `weekly` 이력 스캔(`.env.bak` 8건 → D-203), `release`(새 패키지 첫 푸시 거부 → 재실행, D-205) | Actions 탭 |
 | D-186 | CI/CD 범위 밖으로 둔 것 | ⏸ | ① Kafka→Spark→Gold 전체 e2e(비용 큼) ② Airflow·Spark 이미지는 CI 빌드·GHCR 게시 안 함 ③ arm64 이미지 없음(Mac 은 로컬 빌드) ④ Trivy/SBOM/이미지 서명 없음 ⑤ 배포(서버 없음) | 필요해질 때 ADR |
 | D-187 | `api-contract-watch`(실제 공공 API 주기 호출로 응답 모양 변화 감시) | ⏸ | 하지 않음: 실제 키를 CI Secrets 에 넣어야 하고(결정 2 와 충돌), 호출 한도를 쓴다. 대안: 수집기가 이미 `rejects`·스키마 위반을 감사 로그에 남긴다 | 키를 CI 에 둘 의사가 생기면 별도 결정 |
-| D-188 | Actions 사용량(분) | ❓ 👤 | PR 1회 약 40~60분 [추정] — 실제는 첫 실행 후 Settings → Billing. private Free 2,000분/월 | 첫 초록불 뒤 확인, 분이 모자라면 ADR "비용과 시간" 의 3가지 |
-| D-189 | CI 첫 초록불로 닫을 수 있는 것 | 👤 | D-181(PG17/PostGIS 3.6.1 에서 시험), D-160·D-174(CI 반영 완료 확인) | `test-pg`·`test-core` 초록불 |
-| D-190 | Spark 컨테이너 시험이 새 `pytest.ini`(`-p layers_plugin`)로 도는지 | ❓ 👤 | 샌드박스에서는 pyspark 4.1.3 로 통과. 컨테이너는 `tests/support` 를 `pythonpath` 로 이미 쓰므로 괜찮다고 [추정] | 이미지 재빌드 후 `scripts/spark_test.sh` |
-| D-191 | PostGIS 이미지의 linux/amd64 매니페스트 | ❓ | Mac(arm64)에서는 arm64 항목을 확인했으나 러너는 amd64. `imresamu/postgis` 가 amd64 도 제공한다고 [추정] — 모르면 `test-pg` 의 서비스 시작 단계에서 바로 실패로 드러남 | 첫 실행 |
-| D-192 | 실제 docker 빌드·이미지 검사(`image-guard`) | ❓ | 샌드박스에는 docker CLI 만 있고 데몬/레지스트리 접근이 없다. 검사 로직은 단위 시험(목록·사용자 판정)으로만 확인 | 첫 실행의 `docker-build` job |
+| D-188 | Actions 사용량(분) | ✅ 11-09 | 실측: **Actions Linux 128분(Nov 7~9), $0.006/분, 총액 $0.77, 청구 $0**. 오늘 `ci`·`weekly`·`release` 를 여러 번(실패·재실행 포함) 돌린 값이라 평소 PR 비용은 이보다 작을 가능성이 크다 [추정]. 월 포함량 2,000분의 약 6.4%. `weekly` 1회 소요 분은 아직 모름 | Billing → Usage |
+| D-189 | CI 첫 초록불로 닫을 수 있는 것 | ✅ 11-09 | `test-pg` 초록 → D-181(PG17/PostGIS 3.6.1 에서 시험) 닫음, D-160·D-174(CI 반영) 닫음. D-191(amd64 PostGIS 이미지)도 서비스 컨테이너가 떠서 해소 | — |
+| D-190 | Spark 컨테이너 시험이 새 `pytest.ini` 로 도는지 | ✅ 11-09 | 이미지 재빌드 후 `scripts/spark_test.sh` **114 passed / 4 skipped**(Postgres 시험은 컨테이너에 DB 가 없어 skip). 처음 두 번 실패: ① 컨테이너 pytest 는 시스템 패키지(구버전, Python 3.10)라 `-p layers_plugin` 을 PYTHONPATH 적용 전에 import 하다 실패 ② `pytest.ini` 의 `pythonpath` 를 무시해 `pg_support` import 실패(②는 Step 11 이전부터 있던 잠복 문제로 [추정] — 두 파일이 컨테이너에서 돈 기록이 없다). 래퍼 `docker/spark-base/urbanstream-pytest.sh` 가 `tests/support` 를 PYTHONPATH 에 넣고 `-o addopts=-ra` 로 덮어쓰도록 수정, 정적 시험·변이 2건 추가 | 런북 |
+| D-191 | PostGIS 이미지의 linux/amd64 매니페스트 | ✅ 11-09 | `test-pg` 서비스 컨테이너가 러너(amd64)에서 기동·시험 통과 | — |
+| D-192 | 실제 docker 빌드·이미지 검사(`image-guard`)·GHCR 푸시 | ✅ 11-09 | `ci` 의 `docker-build` 초록, `release` 로 `urbanstream-api`·`urbanstream-dashboard` 가 GHCR 에 올라감(태그 `0.1.0`·`sha-<7>`, private). 새 패키지 첫 푸시는 한 번 거부된다(D-205) | — |
 | D-193 | 브랜치 보호 | 👤 ⏸ | 선택. 필수 체크는 `ci-ok` 하나. private Free 플랜에서의 지원 여부 [미확인] | 런북 5단계 |
 | D-194 | 저장소를 public 으로 바꿀지 | ❓ 👤 | 분은 무제한이 되지만 코드·이력이 공개된다. 먼저 주간 `secrets-full`(전체 이력 스캔) 통과와 D-71(데이터 파일 이력) 확인 필요 | 포트폴리오 공개 단계 |
+| D-195 | `.env.bak` 이 커밋 71b5977 로 push 됨(11-09) | 🔴 👤 ⏸ | Step 11 의 `tracked` 시험이 발견. 실제 키·비밀번호 변수가 들어 있다(이름: SEOUL_API_KEY, DATA_GO_KR_KEY, ALERT_WEBHOOK_URL, 각종 DB·Airflow·API 비밀 등). 0d04ab9 에서 추적 해제 + `.gitignore` 에 `.env.*`(예외 `.env.example`). **사용자 결정: 개인 private 저장소라 키 교체·이력 삭제는 하지 않고 그대로 둔다.** `.gitleaks.toml` 이 이 경로만 허용해 주간 전체 이력 스캔이 매주 빨갛지 않게 함. `.env.bak` 값이 현재 `.env` 와 같은지는 확인하지 않았다 | **저장소를 public 으로 바꾸기 전**: ① 외부 키 3개 재발급(권장 나머지 로컬 비밀도) ② `.gitleaks.toml` 의 허용 제거 ③ 이력 정리(`git filter-repo`) 여부 재판단 — D-194 와 함께 |
+| D-203 | `.gitleaksignore`(지문 8개)와 `.gitleaks.toml` 의 `.env.bak` 허용 | 👤 ⏸ | 11-09 `weekly` 의 전체 이력 스캔이 `.env.bak` 값 8개를 정확히 찾아냈다(스캐너 동작 확인). 경로 허용이 이력 스캔에서 먹히지 않아 지문 파일로 무시. **공개 전환 전에 두 허용을 모두 제거하고 키를 폐기** (D-195) | D-195 |
+| D-204 | 11-09 `weekly` 첫 실행에서 나온 워크플로 오류 2건 | ✅ | ① `spark` job 이 `-m spark` 로 `tests/unit` 파일을 걸러 0개 선택(exit 5) → 경로 직접 지정으로 수정 ② `secrets-full` 이 위 8건 지적. 둘 다 시험·변이 시험 추가 | — |
+
+
+## L. Step 12 (Azure 클라우드 배포) — 계획 단계, 11-09
+
+아직 구현 전이다. 결정 제안서는 새 채팅에서 쓰고 사용자가 승인한 뒤 구현한다(HANDOFF 7-12). 번호는 D-196 부터.
+
+| ID | 항목 | 상태 | 현재 알려진 것 | 확인 방법 / 어디에 |
+|---|---|---|---|---|
+| D-196 | 클라우드 IP 에서 한국 공공 API 호출이 되는가 | ❓ 🔴 | **확인하지 못했다.** 해외·클라우드 IP 를 막는 API 가 있을 수 있다 [추정]. 막히면 이 단계의 전제가 무너지므로 가장 먼저 확인 | VM 을 만든 직후 `collector once` 로 5개 소스 호출 |
+| D-197 | Azure 크레딧 금액·만료일 | ❓ 👤 | 사용자가 "크레딧 보유"라고만 말함. 금액·만료·허용 리전·VM 크기 쿼터 모두 [미확인] | 새 채팅 첫 질문 |
+| D-198 | 도메인·TLS | ❓ 👤 | 도메인 보유 여부 모름. 없으면 Azure 가 주는 DNS 이름(`<이름>.koreacentral.cloudapp.azure.com`)으로 인증서를 받을 수 있다고 [추정] | 새 채팅에서 질문 |
+| D-199 | 대시보드(Streamlit)에 로그인이 없다 | 🔴 ⏸ | API 는 `X-API-Key` 가 있지만 대시보드 화면 자체는 인증이 없다. 공개 주소로 열려면 프록시 단 인증(basic auth) 또는 IP 허용이 필수. 로컬(127.0.0.1)에서는 문제 없었다 | Step 12 설계에 포함 |
+| D-200 | Mac 수집기와 VM 수집기를 동시에 돌리면 API 호출 한도를 두 배로 쓴다 | ⏸ | 버스 호출 한도가 아직 미해결이다(HANDOFF 9장). 전환 시 Mac 수집기를 먼저 중지 | 전환 절차서에 명시 |
+| D-201 | VM 크기 근거 | ❓ 👤 | 스트리밍만 가동했을 때 합계 약 1.0 GiB(11-03)였으나, Airflow 3개·API·대시보드·monitor 까지 전부 켠 합계는 측정한 적이 없다(D-90). Docker VM 7,851 MiB 에서 돌고 있음 | Mac 에서 전체 가동 후 `scripts/stack.sh stats` 합계 |
+| D-202 | 신규 DB 에 마이그레이션 001~014 를 처음부터 적용하는 경로 | ⏸ | CI 의 `test-pg` 와 샌드박스에서는 시험 fixture 로 돌지만 `scripts/migrate.py` 로 빈 DB 에 순서대로 적용하는 경로를 클라우드에서 처음 실행한다. 이미 적용된 마이그레이션은 수정하지 않는다 | Step 12 구현 시 |
+
+## M. Step 11 마감에서 나온 것 + Step 12 설계 입력 (11-09 오후)
+
+| ID | 항목 | 상태 | 현재 알려진 것 | 확인 방법 / 어디에 |
+|---|---|---|---|---|
+| D-205 | GHCR 새 패키지 첫 푸시가 `denied` | ✅ 우회 | `release` 에서 레이어는 올라가고 마지막 단계만 `error from registry: denied`. 토큰은 `Packages: write` 였고 패키지 Actions 접근도 admin 이었다. **재실행하면 통과**(api, 이어서 dashboard 모두). 새 패키지가 처음 생길 때 저장소 접근 연결이 늦는 것으로 [추정] | 새 이미지를 게시할 때(예: Airflow·Spark) 첫 푸시는 재실행. 필요하면 `release.yml` 에 푸시 재시도 추가 |
+| D-206 | **수집기(collector)는 compose 서비스가 아니다** | 🔴 ⏸ Step 12 | `docker-compose.yml` 에 collector 가 없다. 지금은 Mac 호스트에서 `python -m collector run`(`caffeinate -i`)으로 돌고 Kafka 에 `localhost:9092`(`KAFKA_BOOTSTRAP`)로 붙는다. 상태는 `data/collector/budget.json`. 클라우드에서는 이것을 어떻게 24시간 돌릴지(컨테이너화 + override 서비스 vs systemd) **먼저 결정해야 한다** | Step 12 결정 제안서 D12-13 |
+| D-207 | 호스트 Python 스크립트에 기대는 기동 절차 | ⏸ Step 12 | `stack.sh up-*` 가 호스트의 `python3` 로 `scripts/migrate.py`·`scripts/db_bootstrap.py`·`scripts/stack_env.py` 를 실행한다(psycopg 필요). 수동 Gold 실행(`scripts/gold_run.sh`)도 Spark 는 Parquet 만 만들고 DB 적재는 호스트 Python(`batch/gold_load.py`)이 한다(ADR-0008 ⑤; Airflow 경로는 컨테이너에서 실행 — 확인 필요). VM 에도 같은 Python 환경(3.11+)이나 이를 대신하는 컨테이너 경로가 필요 | Step 12 구현 시 |
+| D-208 | compose 이미지 일부가 고정되지 않음 | ⏸ | `kafbat/kafka-ui:latest`(dev 프로파일만). 운영 스택은 `apache/kafka:3.9.2`, `imresamu/postgis:17-3.6.1-bookworm`, `urbanstream/spark-bronze:4.1.3`, `urbanstream/airflow:3.3.0` 으로 고정 | 클라우드 VM 에는 dev 프로파일을 올리지 않는다 |
+| D-209 | Mac 의 Compose 는 v2.10.2(오래됨) | ⏸ | `stack.sh` 가 `--wait-timeout` 을 쓰지 않고 `airflow-scheduler` 를 먼저 따로 빌드하는 등 v2.10 의 한계를 우회한다. VM 의 Compose 는 더 새로울 수 있어, 우회 코드가 그대로 동작하는지 확인 필요 | Step 12 첫 기동 |
+| D-210 | Airflow 이미지의 pytest 가 구버전일 수 있다 | ❓ | Spark 이미지는 시스템 pytest(구버전)라 `pytest.ini` 의 `pythonpath`·`-p` 를 못 쓴다는 것이 확인됐다. Airflow 이미지에서 시험을 돌린 적은 없다 — 돌릴 일이 생기면 같은 점검 | 필요 시 |

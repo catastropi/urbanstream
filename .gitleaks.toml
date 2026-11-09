@@ -7,6 +7,8 @@ useDefault = true
 [allowlist]
 description = "비밀이 아닌 것"
 # 녹화한 API 응답 샘플: 서비스 키는 ***KEY*** 로 마스킹되어 있다(tests/fixtures/recorded/README.md)
-paths = ['''tests/fixtures/recorded/''']
+# .env.bak: 커밋 71b5977 에 실수로 올라간 .env 백업(0d04ab9 에서 추적 해제). 이력에서는 지우지 않았다 — 개인 private 저장소라 그대로 두기로 결정(11-09).
+#   ⚠ 저장소를 public 으로 바꾸기 전에 이 값들을 폐기(재발급)하고 이 항목을 제거한 뒤 이력 정리 여부를 다시 판단한다(DEFERRED D-195).
+paths = ['''tests/fixtures/recorded/''', '''^\.env\.bak$''']
 # CI 의 일회용 Postgres 비밀번호는 '비밀이 아님'을 이름에 적어 둔 더미 값이다(.github/workflows, scripts/ci_checks.py)
 regexes = ['''ci-not-a-secret''']
