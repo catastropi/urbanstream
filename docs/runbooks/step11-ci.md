@@ -14,6 +14,12 @@ cp ~/Downloads/urbanstream_full.zip .
 unzip -o urbanstream_full.zip -d .
 ```
 
+```zsh
+rm urbanstream_full.zip
+```
+
+zip 은 풀자마자 지웁니다(`.gitignore` 의 `*.zip` 이 git 에 올라가는 것은 막지만, 폴더에 남겨 두면 다음 압축 때 섞입니다). 11-09 에 `git add -A` 로 zip 이 추적된 적이 있습니다.
+
 `.env` 와 `data/` 는 zip 에 없으므로 건드리지 않습니다. 이번에 바뀐 것: `.github/`(워크플로 3개·dependabot), `.gitleaks.toml`, `ruff.toml`, `pytest.ini`, `scripts/ci_*.py`·`pin_*.py`·`mutation_ci.py`, `tests/support/layers_plugin.py`, `tests/e2e/`, `tests/unit/test_{workflows,ci_checks,ci_tools,layers_plugin}.py`.
 
 ```zsh

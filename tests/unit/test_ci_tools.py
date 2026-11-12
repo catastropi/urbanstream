@@ -44,11 +44,15 @@ def test_classify_docs_only_runs_nothing_heavy():
 
 def test_classify_api_change_selects_api_and_docker_not_dags():
     res = CH.classify(["api/main.py"])
-    assert res == {"api": True, "dags": False, "docker": True}
+    assert res == {"api": True, "dags": False, "docker": True, "infra": False}
 
 
 def test_classify_dag_change_selects_only_dags():
-    assert CH.classify(["dags/x.py"]) == {"api": False, "dags": True, "docker": False}
+    assert CH.classify(["dags/x.py"]) == {"api": False, "dags": True, "docker": False, "infra": False}
+
+
+def test_classify_infra_change_selects_only_infra():
+    assert CH.classify(["infra/terraform/main.tf"]) == {"api": False, "dags": False, "docker": False, "infra": True}
 
 
 def test_classify_each_group_triggers_on_its_own_prefix():

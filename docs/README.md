@@ -2,6 +2,7 @@
 
 - `step0-guide.md` — Step 0 (API 스모크 테스트) 실행 가이드와 확정 사항.
 - `api-catalog/` — Step 0 에서 **직접 호출해 확인한** 각 API 의 필드·코드·형식·계약 기록. 확인 안 된 칸은 '미확인'. 입구는 `api-catalog/README.md`.
+- `NEXT_CHAT_PROMPT.md` — 다음 채팅(14차)의 첫 메시지로 붙여 넣는 시작 프롬프트 (읽는 순서, 확정된 사실, 첫 행동, 규칙, 미확인 항목).
 - `DEFERRED.md` — **안 한 것·확인 못 한 것·일부러 미룬 것**과 어디에 추가할지의 단일 장부. 새 채팅은 HANDOFF.md 와 함께 읽는다.
 - `adr/` — Architecture Decision Record. 구조적 결정을 날짜·이유와 함께 한 파일씩 남긴다.
   - `0001-envelope-event-time-dedup.md` — envelope 필드, 소스별 event_time / dedup_key
@@ -24,6 +25,7 @@
   - `step6-gold.md` · `step7a-airflow.md` · `step7b-marts.md` · `step7c-marts.md` · `step8-recovery.md` — Gold / Airflow / 마트 / 복구 훈련
   - `step9-api.md` — API 기동·점검(curl)·오류 코드·테스트·키 교체 (사용자가 Mac 에서 실행)
   - `step10-dashboard.md` — 대시보드 기동·화면 확인·메모리·Tableau CSV 만들기와 게시 전 점검 (사용자가 Mac 에서 실행)
+  - `mac-on-off.md` — Mac 에서 스택·수집기를 끄고 켜는 절차, 절전(덮개 닫힘) 주의 (사용자가 Mac 에서 실행, Step 12 전)
   - `step11-ci.md` — 핀 만들기(gitleaks·액션 SHA)·commit/push·Actions 첫 실행 확인·릴리스 태그·되돌리기 (사용자가 Mac 에서 실행)
 
 전체 설계는 이 저장소 밖(대화 세션)에서 만든 Architecture Blueprint 문서가 기준이며,

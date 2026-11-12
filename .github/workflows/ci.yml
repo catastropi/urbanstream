@@ -30,6 +30,7 @@ jobs:
       api: ${{ steps.c.outputs.api }}
       dags: ${{ steps.c.outputs.dags }}
       docker: ${{ steps.c.outputs.docker }}
+      infra: ${{ steps.c.outputs.infra }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -213,10 +214,24 @@ jobs:
           python scripts/ci_checks.py image-guard urbanstream/dashboard:ci
           docker run --rm --entrypoint python urbanstream/dashboard:ci -c "import dashboard.client, dashboard.contract"
 
+  terraform:
+    # Step 12: Terraform 형식·문법만 본다(apply·plan 은 CI 에서 하지 않는다). 바이너리는 sha256 고정(scripts/ci_terraform.py) — 서드파티 액션을 쓰지 않는다.
+    needs: changes
+    if: needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+      - name: terraform fmt -check + init -backend=false + validate
+        run: python3 scripts/ci_terraform.py check
+
   ci-ok:
     # 브랜치 보호를 켠다면 이 job 하나만 '필수 검사'로 지정하면 된다. 건너뛴 job(skipped)은 통과로 본다.
     if: always()
-    needs: [changes, hygiene, secrets, test-core, test-minimal, test-pg, mutation-api, dags, docker-build]
+    needs: [changes, hygiene, secrets, test-core, test-minimal, test-pg, mutation-api, dags, docker-build, terraform]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

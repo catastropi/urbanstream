@@ -1,0 +1,15 @@
+# Step 12 (ADR-0014): Azure VM 용 덮어쓰기 파일. 기존 docker-compose.yml 은 수정하지 않는다.
+#
+# 사용 (VM 에서, scripts/cloud_remote.sh 가 한다):
+#   docker compose -f docker-compose.yml -f docker-compose.cloud.yml --profile core --profile api --profile dashboard up -d --build --wait postgres api dashboard
+# - 서비스 이름을 직접 적어서 postgres·api·dashboard 만 올린다. kafka(core 프로파일에 같이 있다)·Spark·Airflow·monitor 는 올리지 않는다.
+# - 포트는 기존 파일의 127.0.0.1 바인딩을 그대로 쓴다(여기서 ports 를 다시 쓰지 않는다). 접속은 SSH 터널뿐이다.
+# - 이미지는 VM 에서 빌드한다(GHCR 토큰을 VM 에 두지 않으려고). 태그는 기존 파일의 urbanstream/api·dashboard 그대로.
+services:
+  postgres:
+    # 24시간 켜진 VM 은 재부팅 뒤 스스로 올라와야 한다(Mac 은 on-failure 라 안 올라왔다, D-214). 수동 stop 은 존중한다.
+    restart: unless-stopped
+  api:
+    restart: unless-stopped
+  dashboard:
+    restart: unless-stopped

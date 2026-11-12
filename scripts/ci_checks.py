@@ -39,6 +39,8 @@ def forbidden_tracked(paths: Iterable[str]) -> list[tuple[str, str]]:
             continue
         if name == ".env" or name.startswith(".env."):
             bad.append((s, "환경 파일(.env 계열)은 추적하면 안 된다"))
+        elif name.endswith((".tfstate", ".tfvars")) or ".tfstate." in name or ".terraform" in p.parts[:-1]:
+            bad.append((s, "Terraform 상태·변수·캐시(.tfstate·.tfvars·.terraform/)는 추적하면 안 된다(구독 ID·IP 가 들어간다)"))
         elif any(s.startswith(d) for d in FORBIDDEN_DIR_PREFIXES):
             bad.append((s, "data/ 와 tableau/export/ 의 실파일은 추적하면 안 된다(.gitkeep 만 허용)"))
         elif name in FORBIDDEN_NAMES or FORBIDDEN_PARTS & set(p.parts) or name.endswith(".pyc"):
@@ -89,6 +91,18 @@ def cmd_compose(root: Path = ROOT) -> int:
         print((r.stderr or r.stdout).strip()[:2000])
         return 1
     print("docker compose config: 통과 (더미 환경 파일, 전체 프로파일)")
+    # Step 12: 클라우드 덮어쓰기 파일을 합친 결과도 문법이 맞는지 본다.
+    if (root / "docker-compose.cloud.yml").exists():
+        with tempfile.TemporaryDirectory() as td:
+            envf = Path(td) / "ci.env"
+            envf.write_text(dummy_env_text(), encoding="utf-8")
+            r = subprocess.run(["docker", "compose", "--env-file", str(envf), "-f", "docker-compose.yml", "-f", "docker-compose.cloud.yml",
+                                "--profile", "core", "--profile", "api", "--profile", "dashboard", "config", "-q"],
+                               cwd=root, capture_output=True, text=True)
+        if r.returncode != 0:
+            print((r.stderr or r.stdout).strip()[:2000])
+            return 1
+        print("docker compose config: 통과 (docker-compose.cloud.yml 병합)")
     return 0
 
 

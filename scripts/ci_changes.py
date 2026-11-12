@@ -23,6 +23,7 @@ GROUPS: dict[str, tuple[str, ...]] = {
     "api": ("api/", "sql/", "tests/api/", "requirements-api.txt", "scripts/mutation_api.py", "scripts/export_openapi.py", "tests/contract/"),
     "dags": ("dags/", "batch/", "src/", "docker/airflow/", "tests/unit/test_dags_parse.py", "config/"),
     "docker": ("docker/api/", "docker/dashboard/", "api/", "dashboard/", "requirements-api.txt", "requirements-dashboard.txt", ".dockerignore"),
+    "infra": ("infra/", ".github/terraform.pin"),
 }
 
 

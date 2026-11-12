@@ -1,0 +1,12 @@
+#cloud-config
+# Step 12: VM 첫 부팅 때 도커만 설치한다. 비밀·키·앱 코드는 여기에 없다(앱은 scripts/cloud.sh ship 으로 올린다).
+package_update: true
+packages:
+  - docker.io
+  - docker-compose-v2
+  - python3
+  - ca-certificates
+runcmd:
+  - [systemctl, enable, --now, docker]
+  - [sh, -c, "usermod -aG docker ${admin_username}"]
+  - [sh, -c, "touch /var/lib/urbanstream-cloud-init-done"]

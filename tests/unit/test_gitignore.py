@@ -32,3 +32,8 @@ def test_nested_data_files_and_env_are_ignored_but_gitkeep_is_not(tmp_path):
 def test_tableau_export_output_is_ignored(tmp_path):
     r = _ignored(tmp_path, ["tableau/export/link_speed_hourly.csv", "tableau/export/manifest.json", "tableau/README.md"])
     assert [k for k, v in r.items() if not v] == ["tableau/README.md"]
+
+
+def test_delivery_zip_is_ignored(tmp_path):
+    r = _ignored(tmp_path, ["urbanstream_full.zip", "backup/old.zip", "README.md"])
+    assert [k for k, v in r.items() if not v] == ["README.md"]

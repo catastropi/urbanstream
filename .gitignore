@@ -15,3 +15,15 @@ tableau/export/
 # 환경 파일 백업 (Step 11)
 .env.*
 !.env.example
+
+# 전달용 zip 은 풀고 나면 지운다 (11-09: 저장소에 zip 이 추적된 적이 있다)
+*.zip
+
+# Step 12: Terraform 상태·변수·캐시는 git 에 올리지 않는다(구독 ID·IP 등이 들어간다). 잠금 파일(.terraform.lock.hcl)과 *.tfvars.example 은 올린다.
+infra/**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log

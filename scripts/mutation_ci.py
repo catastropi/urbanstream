@@ -17,12 +17,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 COPY = [".github", ".gitleaks.toml", "ruff.toml", "pytest.ini", "docker-compose.yml", ".env.example", ".gitignore", "scripts", "src", "docker", "dashboard", "api",
-        "sql", "requirements.txt", "requirements-api.txt", "requirements-dashboard.txt", "requirements-dev.txt", "tests/support", "tests/e2e", "tests/contract/snapshots",
-        "tests/unit/test_workflows.py", "tests/unit/test_ci_checks.py", "tests/unit/test_ci_tools.py", "tests/unit/test_layers_plugin.py"]
+        "sql", "infra", "docker-compose.cloud.yml", "requirements.txt", "requirements-api.txt", "requirements-dashboard.txt", "requirements-dev.txt", "tests/support", "tests/e2e", "tests/contract/snapshots",
+        "tests/unit/test_workflows.py", "tests/unit/test_ci_checks.py", "tests/unit/test_ci_tools.py", "tests/unit/test_layers_plugin.py", "tests/unit/test_cloud_infra.py"]
 
 U = "tests/unit/"
 WFT, CCT, TOOLS, LAYT = U + "test_workflows.py", U + "test_ci_checks.py", U + "test_ci_tools.py", U + "test_layers_plugin.py"
 E2E = "tests/e2e/test_api_dashboard_pg.py"
+CLD = U + "test_cloud_infra.py"
 CI, REL, WEEK = ".github/workflows/ci.yml", ".github/workflows/release.yml", ".github/workflows/weekly.yml"
 
 # (설명, 파일, 원래 문자열(정확히 1번 나와야 함), 바꿀 문자열, 잡아야 할 테스트 인자들, PG 필요 여부)
@@ -38,7 +39,7 @@ MUTATIONS = [
     ("release: 액션을 main 브랜치로 참조", REL, '      - uses: actions/setup-python@v6\n        with:\n          python-version: "3.12"\n      - name: 태그', '      - uses: actions/setup-python@main\n        with:\n          python-version: "3.12"\n      - name: 태그', [WFT], False),
     ("ci: hygiene job 의 timeout 제거", CI, "  hygiene:\n    runs-on: ubuntu-latest\n    timeout-minutes: 10\n", "  hygiene:\n    runs-on: ubuntu-latest\n", [WFT], False),
     ("ci: ci-ok 집계 조건 if: always() 제거", CI, "    if: always()\n", "", [WFT], False),
-    ("ci: 집계가 docker-build 를 기다리지 않음", CI, "needs: [changes, hygiene, secrets, test-core, test-minimal, test-pg, mutation-api, dags, docker-build]", "needs: [changes, hygiene, secrets, test-core, test-minimal, test-pg, mutation-api, dags]", [WFT], False),
+    ("ci: 집계가 docker-build 를 기다리지 않음", CI, "needs: [changes, hygiene, secrets, test-core, test-minimal, test-pg, mutation-api, dags, docker-build, terraform]", "needs: [changes, hygiene, secrets, test-core, test-minimal, test-pg, mutation-api, dags, terraform]", [WFT], False),
     ("ci: PG 서비스 이미지를 compose 와 다르게", CI, "  test-pg:\n    runs-on: ubuntu-latest\n    timeout-minutes: 25\n    services:\n      postgres:\n        image: imresamu/postgis:17-3.6.1-bookworm", "  test-pg:\n    runs-on: ubuntu-latest\n    timeout-minutes: 25\n    services:\n      postgres:\n        image: postgres:17", [WFT], False),
     ("ci: 역할 시험 허용 플래그 제거", CI, '      ALLOW_ROLE_TESTS: "1"\n', "", [WFT], False),
     ("weekly: 전체 이력 검사를 diff 로", WEEK, "--mode full", "--mode diff", [WFT], False),
@@ -66,6 +67,33 @@ MUTATIONS = [
     ("layers: e2e 계층 제거", "tests/support/layers_plugin.py", '"integration", "spark", "e2e", ', '"integration", "spark", ', [LAYT], False),
     ("pytest.ini: 플러그인 등록 제거", "pytest.ini", "addopts = -ra -p layers_plugin", "addopts = -ra", [LAYT], False),
     ("e2e: 대시보드가 호출하는 경로 오타(실서버에서만 404)", "dashboard/contract.py", '"/v1/traffic/current"', '"/v1/traffic/curent"', [E2E], True),
+    # --- Step 12 (Azure 최소 증거 배포, ADR-0014) ---
+    ("terraform: SSH 출발지를 모든 곳(*)으로", "infra/terraform/main.tf", "source_address_prefix      = var.allowed_ssh_cidr", 'source_address_prefix      = "*"', [CLD], False),
+    ("terraform: SSH 대신 모든 포트를 허용", "infra/terraform/main.tf", 'destination_port_range     = "22"', 'destination_port_range     = "*"', [CLD], False),
+    ("terraform: VM 비밀번호 로그인을 켬", "infra/terraform/main.tf", "disable_password_authentication = true", "disable_password_authentication = false", [CLD], False),
+    ("terraform: SSH CIDR 검증에서 0.0.0.0/0 거부를 뺌", "infra/terraform/variables.tf", '!contains(["0.0.0.0/0", "::/0"], var.allowed_ssh_cidr) && ', "", [CLD], False),
+    ("terraform: SSH CIDR 에 기본값(전 세계)을 줌", "infra/terraform/variables.tf", 'variable "allowed_ssh_cidr" {\n', 'variable "allowed_ssh_cidr" {\n  default = "0.0.0.0/0"\n', [CLD], False),
+    ("terraform: 기본 VM 크기를 바꿈(크레딧 낭비)", "infra/terraform/variables.tf", 'default     = "Standard_B2s_v2"', 'default     = "Standard_D96s_v5"', [CLD], False),
+    ("cloud-init: docker 설치를 뺌", "infra/terraform/cloud-init.yaml.tftpl", "  - docker.io\n", "  - podman\n", [CLD], False),
+    ("compose 덮어쓰기: api 포트를 전 인터페이스로 다시 정의", "docker-compose.cloud.yml", "  api:\n    restart: unless-stopped", '  api:\n    restart: unless-stopped\n    ports:\n      - "8010:8000"', [CLD], False),
+    ("compose 덮어쓰기: kafka 를 끌어들임", "docker-compose.cloud.yml", "  dashboard:\n    restart: unless-stopped", "  dashboard:\n    restart: unless-stopped\n  kafka:\n    restart: unless-stopped", [CLD], False),
+    ("cloud.sh: 터널을 모든 인터페이스에 엶", "scripts/cloud.sh", '-L "127.0.0.1:${LOCAL_API_PORT}:127.0.0.1:8010"', '-L "${LOCAL_API_PORT}:127.0.0.1:8010"', [CLD], False),
+    ("cloud.sh: 터널 로컬 포트가 Mac 스택(8010)과 겹침", "scripts/cloud.sh", "LOCAL_API_PORT=18010", "LOCAL_API_PORT=8010", [CLD], False),
+    ("cloud.sh: 덤프가 마이그레이션 이력 표 데이터까지 뜸", "scripts/cloud.sh", " --exclude-table-data=ops.schema_migrations'", "'", [CLD], False),
+    ("cloud.sh: 전송 목록 검증에서 tfstate 를 뺌", "scripts/cloud.sh", "\\.tfstate|\\.tfvars$|^data/", "\\.tfvars$|^data/", [CLD], False),
+    ("cloud.sh: 전송 목록이 .gitignore 를 무시(.env 가 섞임)", "scripts/cloud.sh", "git ls-files -z --cached --others --exclude-standard", "git ls-files -z --cached --others", [CLD], False),
+    ("cloud.sh: SSH 호스트 키 확인을 끔", "scripts/cloud.sh", "StrictHostKeyChecking=accept-new", "StrictHostKeyChecking=no", [CLD], False),
+    ("cloud.sh: destroy 뒤 삭제 확인을 뺌", "scripts/cloud.sh", 'if [ "$(az group exists --name "$rg")" = "false" ]; then', "if true; then", [CLD], False),
+    ("cloud_remote.sh: 복원이 한 트랜잭션이 아님(-1 제거)", "scripts/cloud_remote.sh", "psql -v ON_ERROR_STOP=1 -q -1 -U", "psql -v ON_ERROR_STOP=1 -q -U", [CLD], False),
+    ("cloud_remote.sh: 복원 전 비우기가 마이그레이션 이력 표까지 비움", "scripts/cloud_remote.sh", " AND NOT (schemaname = 'ops' AND tablename = 'schema_migrations')", "", [CLD], False),
+    ("cloud_remote.sh: postgres 만이 아니라 core 전체(kafka 포함)를 올림", "scripts/cloud_remote.sh", "$COMPOSE up -d --wait postgres\n", "$COMPOSE up -d --wait\n", [CLD], False),
+    ("cloud_remote.sh: 완료 메시지에 API 키를 출력", "scripts/cloud_remote.sh", 'echo "완료. Mac 에서: scripts/cloud.sh tunnel"', 'echo "완료. 키: ${KEY}"', [CLD], False),
+    (".gitignore: tfstate 규칙을 뺌", ".gitignore", "*.tfstate\n*.tfstate.*\n", "*.tfstate.*\n", [CLD], False),
+    ("ci_checks: tracked 검사가 tfstate/tfvars 를 허용", "scripts/ci_checks.py", 'name.endswith((".tfstate", ".tfvars"))', "False", [CLD], False),
+    ("ci_terraform: validate 단계를 뺌", "scripts/ci_terraform.py", '        [binary, "validate"],\n', "", [CLD], False),
+    ("ci_terraform: sha256 검증 제거", "scripts/ci_terraform.py", "    if got != expected:", "    if False:", [CLD], False),
+    ("ci_terraform: 핀 형식 검사 제거(UNPINNED 통과)", "scripts/ci_terraform.py", 'if not re.fullmatch(r"\\d+\\.\\d+\\.\\d+", v) or not re.fullmatch(r"[0-9a-f]{64}", h):', "if False:", [CLD], False),
+    ("ci: terraform 잡이 서드파티 액션을 씀", CI, "      - name: terraform fmt -check + init -backend=false + validate\n", "      - uses: hashicorp/setup-terraform@v3\n      - name: terraform fmt -check + init -backend=false + validate\n", [CLD, WFT], False),
 ]
 
 
