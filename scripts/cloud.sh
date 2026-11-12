@@ -6,7 +6,7 @@
 #   scripts/cloud.sh tunnel            SSH 터널: http://127.0.0.1:18010 (API), http://127.0.0.1:18501 (대시보드)
 #   scripts/cloud.sh ssh [명령...]     VM 접속
 #   scripts/cloud.sh ps                VM 의 컨테이너 상태
-#   scripts/cloud.sh destroy           terraform destroy 후 리소스 그룹이 사라졌는지 확인
+#   scripts/cloud.sh destroy           terraform destroy 후 리소스 그룹이 사라졌는지 확인 (Cloud Shell 배포는 CLOUD_RG 설정 → 포털 삭제 후 확인)
 #
 # - 터널의 Mac 쪽 포트는 18010·18501 이다: Mac 의 로컬 스택이 8010·8501 을 쓰고 있어도 겹치지 않는다.
 # - 비밀(.env)·data/·state·tfvars 는 VM 으로 보내지 않는다 (.gitignore 에 걸린 파일은 목록에서 빠진다).
@@ -22,7 +22,9 @@ LOCAL_DASH_PORT=18501
 SSH_OPTS=(-i "$KEY" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30)
 
 tf_out() { terraform -chdir="$TF_DIR" output -raw "$1"; }
-target() { echo "$(tf_out admin_username)@$(tf_out public_ip)"; }
+# 보통은 terraform output 에서 읽는다. Cloud Shell 로 apply 한 경우(MFA 우회, 런북 '3-B')에는 Mac 에 state 가 없으므로 환경 변수로 준다:
+#   export CLOUD_HOST=<공용 IP> CLOUD_USER=azureuser CLOUD_RG=urbanstream-step12-rg
+target() { echo "${CLOUD_USER:-$(tf_out admin_username)}@${CLOUD_HOST:-$(tf_out public_ip)}"; }
 
 cmd="${1:-help}"
 shift || true
@@ -75,8 +77,15 @@ case "$cmd" in
     ssh "${SSH_OPTS[@]}" "$(target)" "cd $REMOTE_DIR && docker compose -f docker-compose.yml -f docker-compose.cloud.yml --profile core --profile api --profile dashboard ps postgres api dashboard"
     ;;
   destroy)
-    rg="$(tf_out resource_group)"
-    terraform -chdir="$TF_DIR" destroy
+    if [ -n "${CLOUD_RG:-}" ]; then
+      # Cloud Shell 로 만든 배포: Mac 에는 state 가 없다. 포털(MFA 로 로그인된 세션)에서 리소스 그룹을 지운다.
+      rg="$CLOUD_RG"
+      echo "포털에서 리소스 그룹 $rg 를 삭제하세요(리소스 그룹 → $rg → 삭제, 이름 입력). 삭제가 끝나면 Enter."
+      read -r _
+    else
+      rg="$(tf_out resource_group)"
+      terraform -chdir="$TF_DIR" destroy
+    fi
     if command -v az >/dev/null; then
       if [ "$(az group exists --name "$rg")" = "false" ]; then
         echo "확인: 리소스 그룹 $rg 가 사라졌습니다."

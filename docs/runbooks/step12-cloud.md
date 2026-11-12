@@ -101,6 +101,49 @@ terraform apply
 
 `yes` 를 입력합니다. 끝나면 `cd ../..` 로 프로젝트 루트로 돌아옵니다. 이 시점부터 **비용이 쌓입니다**(시작 시각을 `08_summary.md` 에 적어 두세요).
 
+## 3-B. (MFA 오류 우회) Cloud Shell 에서 apply — 3절 `apply` 가 `RequestDisallowedByAzure ... MFA` 로 거부될 때만
+
+증상(11-12 실제 발생): `terraform apply` 가 첫 리소스(리소스 그룹)에서 401 `RequestDisallowedByAzure: ... without authenticating through MFA`. 확인: `az account get-access-token` 토큰의 `amr` 가 `['pwd']` 뿐이고(`mfa` 없음), 같은 계정이 **포털에서는** 리소스 그룹을 바로 만든다 — 포털 세션 토큰에만 MFA 가 있다. 그래서 인증을 포털 세션에서 받는 **Cloud Shell** 로 `apply` 만 한다(나머지는 Mac). 이 경우 state 는 Cloud Shell 에 있고 Mac 에는 없으며, 지울 때는 포털에서 리소스 그룹을 삭제한다.
+
+1. Mac 에서 업로드용 묶음을 만든다(비밀 없음 — 공개키와 내 IP 가 든 tfvars 만 들어간다. 이 파일을 채팅·git 에 올리지 않는다).
+
+```zsh
+cd infra/terraform && zip -j ~/Desktop/tf_upload.zip main.tf variables.tf outputs.tf versions.tf cloud-init.yaml.tftpl terraform.tfvars .terraform.lock.hcl ~/.ssh/urbanstream_azure.pub && cd ../..
+```
+
+2. 포털 상단의 Cloud Shell 아이콘 → **Bash**. 스토리지 설정 화면이 나오면 "스토리지 계정 필요 없음"(임시 세션)을 고른다 — state 가 필요 없고(삭제는 포털) 다른 리소스를 만들지 않는다. 구독은 `Azure for Students`.
+3. Cloud Shell 의 업로드 버튼으로 `tf_upload.zip` 을 올린 뒤:
+
+```bash
+mkdir -p ~/tf && cd ~/tf && unzip -o ~/tf_upload.zip && mkdir -p ~/.ssh && mv urbanstream_azure.pub ~/.ssh/
+```
+
+```bash
+export ARM_SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
+```
+
+```bash
+terraform init
+```
+
+```bash
+terraform apply
+```
+
+`yes` 입력. 끝나면 공용 IP 를 확인한다(이 IP 를 Mac 터미널에 옮겨 적는다).
+
+```bash
+terraform output -raw public_ip
+```
+
+4. Mac 터미널(프로젝트 루트)에서 아래 세 변수를 설정한다. 이후 `scripts/cloud.sh dump / up / tunnel / ps` 는 그대로 쓴다(5~6절).
+
+```zsh
+export CLOUD_HOST="<위에서 확인한 공용 IP>" CLOUD_USER=azureuser CLOUD_RG=urbanstream-step12-rg
+```
+
+7절의 `scripts/cloud.sh destroy` 는 `CLOUD_RG` 가 있으면 포털에서 리소스 그룹을 지우라고 안내하고, 지운 뒤 `az group exists` 로 확인한다. (Cloud Shell 임시 세션은 유휴 20분 뒤 사라질 수 있다 — `apply` 가 끝난 뒤에는 필요 없다.) 세션이 `apply` 도중 끊기면 포털에서 `urbanstream-step12-rg` 를 지우고 처음부터 다시 한다.
+
 ## 4. Mac 에서 스냅샷 만들기
 
 Mac 스택이 켜져 있어야 합니다(`docs/runbooks/mac-on-off.md` 2번; 덮개 닫지 않기). **마트가 최신인지**(대시보드 건강 화면의 Gold 마트 최신 시각, Airflow 의 `gold_intraday` 초록) 먼저 봅니다 — 스냅샷에는 그 시점까지만 들어갑니다.
@@ -155,6 +198,7 @@ scripts/cloud.sh destroy
 | 증상 | 원인 [추정] | 조치 |
 |---|---|---|
 | `scripts/cloud.sh up` 이 "VM 준비를 확인하지 못했습니다" | 내 공인 IP 가 바뀌어 NSG 가 막음 / cloud-init 실패 | tfvars 의 `allowed_ssh_cidr` 수정 → `terraform apply`. cloud-init 은 `scripts/cloud.sh ssh sudo cat /var/log/cloud-init-output.log` |
+| `terraform apply` 가 MFA 오류(401 `RequestDisallowedByAzure`) | CLI 토큰에 MFA 없음(`amr` = `['pwd']`) | 3-B 절(Cloud Shell) |
 | `terraform apply` 가 크기/쿼터 오류 | 리전 vCPU 한도 6, 용량 | 오류 문구를 알려 주세요. `vm_size` 변경 |
 | 마이그레이션 단계에서 실패 | 첫 클라우드 실행(D-202) | 출력의 파일명·오류를 알려 주세요(비밀 제외). 이미 적용된 SQL 은 수정하지 않습니다 |
 | 복원 단계에서 오류 | pg_dump↔psql 버전·FK | 한 트랜잭션이라 데이터는 비어 있음. 오류 문구를 알려 주세요 |

@@ -229,6 +229,14 @@ def test_destroy_verifies_resource_group_is_gone():
     assert "terraform -chdir" in d and "destroy" in d and "az group exists" in d and "exit 1" in d
 
 
+def test_cloud_sh_accepts_cloud_shell_deployments_via_env_without_weakening_checks():
+    t = sh("cloud.sh")
+    assert "${CLOUD_HOST:-$(tf_out public_ip)}" in t and "${CLOUD_USER:-$(tf_out admin_username)}" in t
+    d = t[t.index("  destroy)"):t.index("  *)")]
+    assert "CLOUD_RG" in d and "az group exists" in d and "terraform -chdir" in d, "state 가 있을 때의 destroy 경로가 남아 있어야 한다"
+    assert d.index("az group exists") > d.index("CLOUD_RG"), "어느 경로든 삭제 확인을 거친다"
+
+
 # --- gitignore · tracked 검사 ----------------------------------------------------------------------------------
 
 def test_gitignore_covers_terraform_state_and_vars_but_not_examples():

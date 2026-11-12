@@ -309,3 +309,4 @@ Step 12 코드는 완료(샌드박스: 정적·단위 시험 + 변이)했고 **A
 | D-239 | Step 12 비용 실측 | ⏳ 👤 | Korea Central `B2s_v2` 단가 미확인. 가동 시각·destroy 시각·비용 그래프를 `docs/evidence/step12/08_summary.md` 에 | 런북 7절 |
 | D-240 | `deploy.yml`/OIDC 없음, GHCR 미사용 | ⏸ | 의도된 범위(ADR-0014 D12-6·D12-10). D-226(앱 등록 권한)은 필요해질 때 확인 | — |
 | D-241 | 변이 시험 1건(e2e) 건너뜀 | ⏸ | `mutation_ci` 65건 중 64 검출, 1건은 `GOLD_TEST_DSN` 이 없어 건너뜀(기존 동작). CI 의 `test-pg` 에서 확인됨 | — |
+| D-242 | `terraform apply` 가 MFA 오류로 거부됨(11-12) | ✅ 우회 경로 마련 / ⏳ 실행 대기 | `az login` 토큰의 `amr` 가 `['pwd']` 뿐이라 401 `RequestDisallowedByAzure`(MFA 필요). 같은 계정이 포털에서는 리소스 그룹을 바로 만든다 → 포털 세션 토큰에만 MFA 가 있다. 일반 창·시크릿 창·device code·`--scope` 로그인 모두 `mfa` 가 안 붙음. 패스키는 등록됨. 우회: Cloud Shell 에서 `apply`, Mac 은 `CLOUD_HOST`·`CLOUD_USER`·`CLOUD_RG` 환경 변수로 `cloud.sh` 사용(런북 3-B). 근본 원인(학교 테넌트의 MFA 적용 방식)은 확인하지 못했다 | 런북 3-B. 지울 때는 포털에서 리소스 그룹 삭제 |
