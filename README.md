@@ -90,6 +90,7 @@ tests/            unit·integration·contract·e2e·recovery·spark    docs/  AD
 
 | 문서 | 용도 |
 |---|---|
+| `docs/GUIDE.md` | **통합 가이드** — ADR·런북·API 카탈로그·ERD·증거를 한 파일로(목차 포함) |
 | `HANDOFF.md` | 전체 진행 이력과 규칙(새 채팅 인수인계) |
 | `docs/DEFERRED.md` | 미룬 일·미확인 장부 |
 | `docs/adr/` | 설계 결정 14건 |

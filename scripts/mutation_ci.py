@@ -17,13 +17,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 COPY = [".github", ".gitleaks.toml", "ruff.toml", "pytest.ini", "docker-compose.yml", ".env.example", ".gitignore", "scripts", "src", "docker", "dashboard", "api",
-        "sql", "infra", "docker-compose.cloud.yml", "requirements.txt", "requirements-api.txt", "requirements-dashboard.txt", "requirements-dev.txt", "tests/support", "tests/e2e", "tests/contract/snapshots",
-        "tests/unit/test_workflows.py", "tests/unit/test_ci_checks.py", "tests/unit/test_ci_tools.py", "tests/unit/test_layers_plugin.py", "tests/unit/test_cloud_infra.py"]
+        "sql", "infra", "docker-compose.cloud.yml", "requirements.txt", "requirements-api.txt", "requirements-dashboard.txt", "requirements-dev.txt", "docs", "tests/support", "tests/e2e", "tests/contract/snapshots",
+        "tests/unit/test_workflows.py", "tests/unit/test_ci_checks.py", "tests/unit/test_ci_tools.py", "tests/unit/test_layers_plugin.py", "tests/unit/test_cloud_infra.py", "tests/unit/test_build_guide.py"]
 
 U = "tests/unit/"
 WFT, CCT, TOOLS, LAYT = U + "test_workflows.py", U + "test_ci_checks.py", U + "test_ci_tools.py", U + "test_layers_plugin.py"
 E2E = "tests/e2e/test_api_dashboard_pg.py"
 CLD = U + "test_cloud_infra.py"
+BGT, BG = U + "test_build_guide.py", "scripts/build_guide.py"
 CI, REL, WEEK = ".github/workflows/ci.yml", ".github/workflows/release.yml", ".github/workflows/weekly.yml"
 
 # (설명, 파일, 원래 문자열(정확히 1번 나와야 함), 바꿀 문자열, 잡아야 할 테스트 인자들, PG 필요 여부)
@@ -94,6 +95,11 @@ MUTATIONS = [
     ("ci_terraform: sha256 검증 제거", "scripts/ci_terraform.py", "    if got != expected:", "    if False:", [CLD], False),
     ("ci_terraform: 핀 형식 검사 제거(UNPINNED 통과)", "scripts/ci_terraform.py", 'if not re.fullmatch(r"\\d+\\.\\d+\\.\\d+", v) or not re.fullmatch(r"[0-9a-f]{64}", h):', "if False:", [CLD], False),
     ("ci: terraform 잡이 서드파티 액션을 씀", CI, "      - name: terraform fmt -check + init -backend=false + validate\n", "      - uses: hashicorp/setup-terraform@v3\n      - name: terraform fmt -check + init -backend=false + validate\n", [CLD, WFT], False),
+    ("build_guide: 코드 펜스 안의 # 까지 제목으로 밀어냄", BG, "out.append(line if fence else line_fn(line))", "out.append(line_fn(line))", [BGT], False),
+    ("build_guide: 인라인 코드 안의 링크까지 바꿈", BG, 'CODE_SPAN = re.compile(r"(`+)(?:(?!\\1).)+?\\1")', 'CODE_SPAN = re.compile(r"(?!)")', [BGT], False),
+    ("build_guide: md 링크를 앵커로 바꾸지 않음", BG, "        if resolved in guide_set:", "        if False:", [BGT], False),
+    ("build_guide: 제목 깊이를 안 밀음", BG, "SHIFT = 2", "SHIFT = 0", [BGT], False),
+    ("build_guide: 손실 검사가 항상 통과", BG, '    return _map_lines(text, lambda line: _outside_code(line, lambda s: LINK.sub(lambda m: m.group(1) + "X" + m.group(3), s)))', '    return ""', [BGT], False),
 ]
 
 
