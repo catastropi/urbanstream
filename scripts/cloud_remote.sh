@@ -17,6 +17,7 @@ SCHEMAS="'dim','fact','mart','ops'"
 PSQL() { docker exec -i urbanstream-postgres sh -c 'psql -v ON_ERROR_STOP=1 -q -U "$POSTGRES_USER" -d "$POSTGRES_DB"'; }
 
 echo "[1/6] .env 만들기 (이미 있는 값은 유지, 비밀은 새로 생성)"
+[ -f .env ] || cp .env.example .env
 python3 scripts/stack_env.py
 chmod 600 .env
 
@@ -30,7 +31,7 @@ docker run --rm --network urbanstream_net --env-file .env \
   -v "$PWD":/work:ro -w /work "$API_IMAGE" python scripts/migrate.py
 
 echo "[4/6] api_service 로그인 설정"
-docker run --rm --network urbanstream_net --env-file .env \
+docker run --rm --user "$(id -u):$(id -g)" --network urbanstream_net --env-file .env \
   -e POSTGRES_HOST=postgres -e POSTGRES_PORT=5432 \
   -v "$PWD":/work:ro -w /work "$API_IMAGE" python scripts/db_bootstrap.py --api
 

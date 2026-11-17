@@ -167,6 +167,50 @@ mkdir -p data/bronze data/checkpoints
 
 그다음 `scripts/stack.sh up-streaming`.
 
+## 8. ⚠ Mac 을 72시간보다 오래 꺼 뒀다 켰더니 `spark-bronze` 가 unhealthy 일 때 (`OffsetOutOfRange`)
+
+**무슨 일인가.** Kafka 는 메시지를 72시간만 보관합니다(`config/topics.yaml`, DLQ·audit 은 7일). 그보다 오래 꺼 두면 Bronze 체크포인트가 가리키는 offset 의 데이터가 이미 지워져 있고, 설계대로(`failOnDataLoss=true`, `streaming/bronze.py`) 쿼리가 유실을 숨기지 않고 **실패**합니다. 11-12 17:05 에 끄고 11-16 에 켰을 때 실제로 일어났습니다(DEFERRED D-255). 꺼 둔 동안은 수집기도 서 있었으므로 **그 구간의 데이터는 어디에도 없습니다.** 되살릴 것은 "앞으로"입니다.
+
+**확인.** 로그에 `OffsetOutOfRange`(또는 `data may have been lost`)가 있고, 어느 토픽이 문제인지 본다.
+
+```zsh
+docker compose --profile streaming logs --tail 400 spark-bronze | grep -i -E "OffsetOutOfRange|may have been lost|urban\.|platform\."
+```
+
+토픽 → Bronze 표(폴더 이름): `urban.bus.arrival.v1`→`bus_arrival`, `urban.bus.position.v1`→`bus_position`, `urban.traffic.incident.v1`→`seoul_incident`, `urban.traffic.speed.v1`→`seoul_traffic`, `urban.weather.observation.v1`→`kma_ncst`[추정: 이름 대응], `urban.dlq.v1`→`dlq`, `platform.audit`→`audit`.
+
+**⚠ 가장 중요한 함정.** 체크포인트만 옮기면 안 됩니다. Spark 의 파일 싱크는 `data/bronze/<표>/_spark_metadata` 에 마지막으로 커밋한 batch id(예: 2034)를 기억하고, **그 번호 이하의 새 batch(새 체크포인트가 만든 72 같은 작은 번호)를 "이미 처리됨"으로 보고 조용히 건너뜁니다.** 쿼리는 건강해 보이는데 새 파일이 안 생깁니다(11-16 에 실제로 겪음). 그래서 **체크포인트와 `_spark_metadata` 를 같이** 옮깁니다. 옮긴 곳(`data/_old/`)에는 원본이 남으니 필요하면 되돌릴 수 있습니다.
+
+**복구 (문제가 난 표마다, 예: 3개).**
+
+```zsh
+docker compose --profile streaming stop spark-bronze
+```
+
+```zsh
+mkdir -p data/_old
+```
+
+표 이름만 바꿔 한 번에 하나씩(아래는 `bus_arrival` 예). 한 줄이 길어도 그대로 한 줄로 실행한다.
+
+```zsh
+t=bus_arrival; mv data/checkpoints/bronze/$t data/_old/ckpt_${t}_$(date +%m%d%H%M); mv data/bronze/$t/_spark_metadata data/_old/meta_${t}_$(date +%m%d%H%M)
+```
+
+```zsh
+scripts/stack.sh up-silver
+```
+
+**성공 확인.** 몇 분 뒤 오늘 날짜의 새 폴더·파일이 생기고, Discord 에 `해소` 알림이 온다.
+
+```zsh
+ls data/bronze/bus_arrival | tail -3
+```
+
+**하지 말 것.** 체크포인트만 옮기기. `data/bronze` 전체 삭제(이미 쌓인 Bronze 를 잃는다). `stack.sh reset`.
+
+**예방.** 72시간 넘게 끌 일이 있으면 미리 알아 둔다 — 보관을 7일로 늘리는 선택(D-256, 디스크 더 사용)이 있다. 끄는 날짜·켜는 날짜는 `mac-on-off.md`.
+
 ## 알려진 한계 (정직하게)
 
 - 이 Step 의 이미지 빌드, 실제 Kafka 연동, 배치 도중 kill 복구, 메모리는 **사용자 Mac 에서의 첫 실행이 검증**입니다 (ADR-0005 "검증 상태").

@@ -18,11 +18,5 @@ Spark Structured Streaming 잡 (Blueprint O절). 이미지는 `docker/spark-base
 
 결정 근거 `docs/adr/0005-bronze-spark.md`, `0006`, `0007`. 실행·검증 `docs/runbooks/step4-bronze.md`, `step5-silver.md`.
 
-**아직 없는 것 (Step 5 이후, 이름은 제안)**
-- `traffic_stream.py` — 도로소통/돌발/기상 → dedup, 5분 창 집계, 혼잡 단계, 이상 탐지
-- `bus_stream.py` — 버스 위치/도착 → dedup, 지연 계산
-- `health_stream.py` — platform.audit + Spark 진행 지표 → ops 적재
-
-공통 설계는 Silver 단계에서 정한다. **Silver 는 Bronze 를 읽는다**(ADR-0006 결정 1). 안 한 것·어디에 추가할지는 `docs/DEFERRED.md`.
-
-Blueprint 참고: O절(Spark Streaming Job)
+**만들지 않기로 한 것**
+- `traffic_stream.py`·`bus_stream.py`·`health_stream.py` 는 처음 계획 이름이었다. 집계·지연·이상 탐지는 Airflow 배치(`batch/`, `dags/`)로, 파이프라인 건강은 `monitor` 컨테이너(`src/urbanstream/monitor/`)로 구현했다(ADR-0009, ADR-0010).

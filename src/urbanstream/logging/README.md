@@ -1,10 +1,7 @@
-# logging
+# logging (예약된 자리 — 코드 없음)
 
-구조화 로깅 공통 모듈. (주의: 표준 라이브러리 logging과 이름이 겹치므로
-이 패키지 안에서 표준 logging을 쓸 때는 `import logging as stdlib_logging` 처럼 구분할 것)
+공통 구조화 로깅 모듈을 둘 계획이었으나 만들지 않았다. 이름이 표준 라이브러리 `logging` 과 겹쳐 혼동 위험이 있어
+이 폴더는 패키지(`__init__.py`)로 만들지 않았다.
 
-- get_logger(name) — JSON 구조화 로그 포맷 (기존 ecommerce-pipeline의 logging_utils.py 계승)
-- log_duration 데코레이터
-- 인증키 등 민감정보를 로그에서 자동 마스킹 (scripts/smoke_test.py의 redact() 로직을 공통화)
-
-Blueprint 참고: D-1(계승할 요소 - 로거 + log_duration)
+- 인증키 마스킹: `collector/` 의 마스킹, `urbanstream.notify` 의 `_mask.py`, API 의 JSON 로그(`api/main.py`)가 각자 처리한다.
+- 공통화는 후속 과제로 `docs/DEFERRED.md` 에 둔다.

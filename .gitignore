@@ -27,3 +27,4 @@ infra/**/.terraform/
 !*.tfvars.example
 crash.log
 crash.*.log
+.terraform/

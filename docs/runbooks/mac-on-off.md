@@ -77,3 +77,26 @@ python -m collector status
 - **Docker Desktop·Mac 재시작 후 컨테이너는 자동으로 켜지지 않는다**(재시작 정책이 `on-failure`, D-214). 위 2번을 다시 한다.
 - 컨테이너가 죽어 있으면 **재생성하기 전에** `docker inspect -f '{{.Name}} 재시작횟수={{.RestartCount}} OOM={{.State.OOMKilled}} 종료={{.State.FinishedAt}}' <컨테이너>` 로 먼저 기록한다(`up-*` 가 컨테이너를 다시 만들면 정보가 사라진다).
 - 하루 중 수집이 비어 있는지는 `ls data/bronze/bus_position` 의 `event_date=...` 폴더 파일 수로 본다(비어 있는 날 = Mac 이 잠든 날).
+
+## 4. 덮개를 닫은 채 돌려야 할 때 (부득이한 경우만)
+**기본은 여전히 "스택이 도는 동안 덮개를 닫지 않는다"(0절).** 11-16~17 에 덮개를 하루 가까이 덮어 둔 채 켜 보니 깨어난 직후 Airflow scheduler 가 한도(4 GiB)에 닿았다(D-257). 꼭 닫아야 하면:
+- 전원 어댑터를 연결하고, 통풍이 되는 곳에 둔다(닫힌 Mac 은 열이 잘 안 빠진다 [추정]). 침대·이불 위 금지. 외부 모니터를 연결하면 덮개를 닫아도 절전하지 않는 경우가 있다 [추정, 내 Mac 에서는 확인 안 함].
+- 닫기 전에 절전을 끈다(관리자 암호 필요). **끝나면 반드시 되돌린다.**
+
+```zsh
+sudo pmset -a disablesleep 1
+```
+
+```zsh
+sudo pmset -a disablesleep 0
+```
+
+- 첫 명령은 닫기 전, 둘째는 연 뒤. 상태 확인은 `pmset -g | grep -i sleep`.
+- **덮개를 연 채 화면만 꺼지는 것은 괜찮다.** `caffeinate -i` 가 수집기를 살려 둔다. 문제는 덮개를 닫아서 자는 것뿐이다.
+- 이 방식으로 하루 이상 돌려 안정적이었다는 **실측은 없다**(D-260). 처음에는 `scripts/stack.sh stats` 로 scheduler 메모리를 자주 본다.
+
+## 5. 72시간보다 오래 꺼 뒀다 켰을 때
+Kafka 보존 72시간(DLQ·audit 7일)이 지나서 `spark-bronze` 가 `OffsetOutOfRange` 로 unhealthy 가 될 수 있다. 그 구간의 데이터는 어디에도 없다(수집기도 꺼져 있었다). **복구는 `docs/runbooks/step4-bronze.md` §8** — 체크포인트와 `_spark_metadata` 를 **함께** 옮겨야 한다. 켠 뒤 `up-silver` 가 unhealthy 로 끝나면 먼저 로그에서 `OffsetOutOfRange` 부터 찾는다.
+
+추가로 긴 정지 뒤에는: `up-airflow` 직후 scheduler 메모리(`scripts/stack.sh stats`)를 본다. Airflow 는 `catchup=False` 라 못 돈 실행을 따라잡지 않지만, 깨어난 직후 몇 시간치 `gold_intraday` 가 몰릴 수 있다. 4 GiB 에 가까워지면 scheduler 를 멈춘다(`docker compose stop airflow-scheduler`, 안 멈추면 `docker ps` 로 이름을 보고 `docker kill`). `silver_reconcile_daily`(04:30)의 `silver_verify` 는 긴 정지 뒤 1800초 제한을 넘길 수 있다(D-258).
+

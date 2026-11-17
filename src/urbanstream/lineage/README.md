@@ -1,8 +1,8 @@
-# lineage
+# lineage (예약된 자리 — 코드 없음)
 
-모든 레코드에 붙는 출처 추적 컬럼을 다루는 헬퍼.
+출처 추적용 공통 헬퍼를 둘 계획이었으나 별도 모듈은 만들지 않았다. 출처 추적은 데이터 열로 구현되어 있다.
 
-- source_system, raw_uri, kafka_topic/partition/offset, bronze_batch_id, pipeline_run_id, pipeline_version(git sha), schema_version 등을 채워주는 공통 함수
-- ops.run_registry 에 run_id -> 코드 버전/설정 해시/입력 범위를 기록
+- Bronze/Silver 열: `event_id`, `raw_uri`, `_kafka_topic/partition/offset`, `ingest_id`, `silver_processed_at` (ADR-0001, ADR-0005)
+- Gold: `ops.load_run`(적재 실행 기록, `dag_id` 포함), `ops.call_audit` (ADR-0008, `sql/001_base.sql`·`009_ops_monitor.sql`)
 
-Blueprint 참고: I절, 원칙 8(lineage 추적)
+`pipeline_version`(git sha)·`run_registry` 는 구현하지 않았다.

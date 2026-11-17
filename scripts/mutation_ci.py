@@ -36,7 +36,7 @@ MUTATIONS = [
     ("release: latest 태그 추가", REL, '-t "${IMG}:${TAG#v}" -t "${IMG}:sha-${SHA::7}" .', '-t "${IMG}:${TAG#v}" -t "${IMG}:latest" .', [WFT], False),
     ("ci: pull_request_target 추가", CI, "on:\n  pull_request:", "on:\n  pull_request_target:\n  pull_request:", [WFT], False),
     ("release: 사용자 비밀 참조(GITHUB_TOKEN 이외)", REL, "GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}", "GH_TOKEN: ${{ secrets.MY_API_KEY }}", [WFT], False),
-    ("release: 액션을 main 브랜치로 참조", REL, '      - uses: actions/setup-python@v6\n        with:\n          python-version: "3.12"\n      - name: 태그', '      - uses: actions/setup-python@main\n        with:\n          python-version: "3.12"\n      - name: 태그', [WFT], False),
+    ("release: 액션을 main 브랜치로 참조", REL, '      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6\n        with:\n          python-version: "3.12"\n      - name: 태그', '      - uses: actions/setup-python@main\n        with:\n          python-version: "3.12"\n      - name: 태그', [WFT], False),
     ("ci: hygiene job 의 timeout 제거", CI, "  hygiene:\n    runs-on: ubuntu-latest\n    timeout-minutes: 10\n", "  hygiene:\n    runs-on: ubuntu-latest\n", [WFT], False),
     ("ci: ci-ok 집계 조건 if: always() 제거", CI, "    if: always()\n", "", [WFT], False),
     ("ci: 집계가 docker-build 를 기다리지 않음", CI, "needs: [changes, hygiene, secrets, test-core, test-minimal, test-pg, mutation-api, dags, docker-build, terraform]", "needs: [changes, hygiene, secrets, test-core, test-minimal, test-pg, mutation-api, dags, terraform]", [WFT], False),
