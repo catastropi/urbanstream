@@ -233,7 +233,7 @@
 | D-192 | 실제 docker 빌드·이미지 검사(`image-guard`)·GHCR 푸시 | ✅ 11-09 | `ci` 의 `docker-build` 초록, `release` 로 `urbanstream-api`·`urbanstream-dashboard` 가 GHCR 에 올라감(태그 `0.1.0`·`sha-<7>`, private). 새 패키지 첫 푸시는 한 번 거부된다(D-205) | — |
 | D-193 | 브랜치 보호 | 👤 ⏸ | 선택. 필수 체크는 `ci-ok` 하나. private Free 플랜에서의 지원 여부 [미확인] | 런북 5단계 |
 | D-194 | 저장소를 public 으로 바꿀지 | ❓ 👤 | 분은 무제한이 되지만 코드·이력이 공개된다. 먼저 주간 `secrets-full`(전체 이력 스캔) 통과와 D-71(데이터 파일 이력) 확인 필요 | 포트폴리오 공개 단계 |
-| D-195 | `.env.bak` 이 커밋 71b5977 로 push 됨(11-09) | 🔴 👤 ⏸ | Step 11 의 `tracked` 시험이 발견. 실제 키·비밀번호 변수가 들어 있다(이름: SEOUL_API_KEY, DATA_GO_KR_KEY, ALERT_WEBHOOK_URL, 각종 DB·Airflow·API 비밀 등). 0d04ab9 에서 추적 해제 + `.gitignore` 에 `.env.*`(예외 `.env.example`). **사용자 결정: 개인 private 저장소라 키 교체·이력 삭제는 하지 않고 그대로 둔다.** `.gitleaks.toml` 이 이 경로만 허용해 주간 전체 이력 스캔이 매주 빨갛지 않게 함. `.env.bak` 값이 현재 `.env` 와 같은지는 확인하지 않았다 | **저장소를 public 으로 바꾸기 전**: ① 외부 키 3개 재발급(권장 나머지 로컬 비밀도) ② `.gitleaks.toml` 의 허용 제거 ③ 이력 정리(`git filter-repo`) 여부 재판단 — D-194 와 함께 |
+| D-195 | `.env.bak` 이 커밋 71b5977 로 push 됨(11-09) | ✅ 공개 전 처리 | Step 11 의 `tracked` 시험이 발견했다. 외부 키 3개(서울 열린데이터광장·data.go.kr·Discord 웹훅)를 재발급해 노출된 값을 폐기했고, `git filter-repo` 로 `.env.bak` 과 내부 작업 문서·과거에 추적된 zip 을 전 이력에서 제거했다. 이력 전체 gitleaks 검사에서 발견 0건을 확인한 뒤 `.gitleaks.toml` 의 `.env.bak` 허용과 `.gitleaksignore` 지문을 지웠다. GitHub 이 옛 커밋을 SHA 로 한동안 보관할 수 있어 키 폐기가 실제 방어다 | — |
 | D-203 | `.gitleaksignore`(지문 8개)와 `.gitleaks.toml` 의 `.env.bak` 허용 | 👤 ⏸ | 11-09 `weekly` 의 전체 이력 스캔이 `.env.bak` 값 8개를 정확히 찾아냈다(스캐너 동작 확인). 경로 허용이 이력 스캔에서 먹히지 않아 지문 파일로 무시. **공개 전환 전에 두 허용을 모두 제거하고 키를 폐기** (D-195) | D-195 |
 | D-204 | 11-09 `weekly` 첫 실행에서 나온 워크플로 오류 2건 | ✅ | ① `spark` job 이 `-m spark` 로 `tests/unit` 파일을 걸러 0개 선택(exit 5) → 경로 직접 지정으로 수정 ② `secrets-full` 이 위 8건 지적. 둘 다 시험·변이 시험 추가 | — |
 
