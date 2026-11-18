@@ -28,3 +28,9 @@ infra/**/.terraform/
 crash.log
 crash.*.log
 .terraform/
+
+# 로컬 전용 작업 문서: 대화 인수인계·점검 보고서·통합본(원본에서 다시 만들 수 있는 파생물)은 저장소에 올리지 않는다.
+HANDOFF.md
+docs/NEXT_CHAT_PROMPT.md
+docs/AUDIT_*.md
+docs/GUIDE.md

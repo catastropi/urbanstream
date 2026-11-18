@@ -1,10 +1,8 @@
 # docs
 
-- `GUIDE.md` — 아래 가이드 문서 40개(이 문서·Step 0 가이드·API 카탈로그·ADR·ERD·런북·증거)를 **내용 그대로** 한 파일로 이은 통합본. 읽기용이다. 원본을 고친 뒤 `python scripts/build_guide.py` 로 다시 만들고 `--check` 로 검사한다. (`HANDOFF.md`·`DEFERRED.md`·`NEXT_CHAT_PROMPT.md`·`AUDIT_*.md` 는 합치지 않는다.)
 - `step0-guide.md` — Step 0 (API 스모크 테스트) 실행 가이드와 확정 사항.
 - `api-catalog/` — Step 0 에서 **직접 호출해 확인한** 각 API 의 필드·코드·형식·계약 기록. 확인 안 된 칸은 '미확인'. 입구는 `api-catalog/README.md`.
-- `NEXT_CHAT_PROMPT.md` — 다음 채팅(15차)의 첫 메시지로 붙여 넣는 시작 프롬프트 (읽는 순서, 확정된 사실, 첫 행동, 규칙, 미확인 항목).
-- `DEFERRED.md` — **안 한 것·확인 못 한 것·일부러 미룬 것**과 어디에 추가할지의 단일 장부. 새 채팅은 HANDOFF.md 와 함께 읽는다.
+- `DEFERRED.md` — **안 한 것·확인 못 한 것·일부러 미룬 것**과 어디에 추가할지의 단일 장부.
 - `adr/` — Architecture Decision Record. 구조적 결정을 날짜·이유와 함께 한 파일씩 남긴다.
   - `0001-envelope-event-time-dedup.md` — envelope 필드, 소스별 event_time / dedup_key
   - `0002-contracts-stdlib-dataclasses.md` — 계약 코드에 외부 검증 라이브러리를 쓰지 않는 이유
@@ -36,4 +34,3 @@
 전체 설계는 이 저장소 밖(대화 세션)에서 만든 Architecture Blueprint 문서가 기준이며,
 이 폴더는 그 설계가 실제 구현·관측과 만나면서 구체화되는 기록을 쌓는 곳이다.
 **충돌하면 Step 0 에서 직접 확인한 사실이 Blueprint 보다 우선한다.**
-- `AUDIT_1117.md` — 2026-11-17 전체 점검 보고서(시험 결과, 정리 내역, 무결성 오류, 감점 요소, 가이드 md 목록).

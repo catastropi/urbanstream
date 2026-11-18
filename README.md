@@ -5,7 +5,7 @@ Kafka → Bronze → Silver → Gold(PostgreSQL/PostGIS)로 흘리고, 데이터
 FastAPI와 대시보드로 보여 주는 **End-to-End 데이터 엔지니어링 포트폴리오 프로젝트**입니다.
 (첫 번째 프로젝트 Olist 이커머스 배치 파이프라인의 뼈대를 이어받고, 정적 데이터·배치 전용이라는 한계를 보완하는 것이 목표.)
 
-> **상태: Step 0~12 완료.** 남은 일은 포트폴리오 마무리(다이어그램·수치·데모)뿐입니다. 진행 이력은 `HANDOFF.md`, 미룬 일은 `docs/DEFERRED.md`.
+> **상태: Step 0~12 완료.** 남은 일은 포트폴리오 마무리(다이어그램·수치·데모)뿐입니다. 미룬 일·미확인 항목은 `docs/DEFERRED.md`.
 
 ## 아키텍처
 
@@ -90,8 +90,6 @@ tests/            unit·integration·contract·e2e·recovery·spark    docs/  AD
 
 | 문서 | 용도 |
 |---|---|
-| `docs/GUIDE.md` | **통합 가이드** — ADR·런북·API 카탈로그·ERD·증거를 한 파일로(목차 포함) |
-| `HANDOFF.md` | 전체 진행 이력과 규칙(새 채팅 인수인계) |
 | `docs/DEFERRED.md` | 미룬 일·미확인 장부 |
 | `docs/adr/` | 설계 결정 14건 |
 | `docs/runbooks/` | 단계별 실행·복구 절차 |
