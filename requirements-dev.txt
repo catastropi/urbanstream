@@ -2,5 +2,5 @@
 -r requirements.txt
 # Step 9: API 테스트 (api/ 를 import 해서 TestClient 로 호출한다)
 -r requirements-api.txt
-httpx>=0.27
-pytest>=8.0
+httpx>=0.27,<1
+pytest>=8.0,<10

@@ -83,7 +83,7 @@ git push
 3. 흔한 원인(예상, [추정]): ① `secrets` — 핀 파일을 커밋하지 않음 ② `test-pg` — 서비스 컨테이너 헬스체크 시간 초과 ③ `dags` — Airflow 설치/constraints URL ④ `docker-build` — 빌드 컨텍스트에서 파일 누락.
 4. 초록불이 되면 사용량(Settings → Billing 의 Actions 분)을 한 번 보고 알려 주세요(D-188).
 
-D-181(PG17/PostGIS 3.6.1 에서의 시험 확인)은 `test-pg` 가 처음 초록불이 될 때 닫을 수 있습니다.
+PG17/PostGIS 3.6.1 에서의 시험 확인은 `test-pg` 가 처음 초록불이 될 때 닫을 수 있습니다.
 
 ## 4. (선택) 릴리스 이미지 시험
 

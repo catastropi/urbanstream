@@ -1,0 +1,12 @@
+# 시험해 본 버전 기록(참고용). CI 와 Docker 이미지는 이 파일을 설치하지 않는다.
+# 환경: Mac(Apple Silicon), conda, Python 3.11, 2026-11-18, `pip list --format=freeze` 결과 중 호스트 도구가 쓰는 패키지만.
+# 재현: pip install -r requirements-lock.txt  (api·dashboard 이미지는 requirements-api.txt · requirements-dashboard.txt 가 ==  로 고정)
+confluent-kafka==2.16.1
+openpyxl==3.1.5
+psycopg==3.3.7
+psycopg-binary==3.3.7
+pyarrow==26.0.1
+pytest==9.2.0
+python-dotenv==1.2.4
+PyYAML==6.0.3
+requests==2.34.2

@@ -1,5 +1,7 @@
 # Step 12 런북 — Azure 최소 증거 배포 (apply → 시연 → destroy)
 
+> **상태(2026-11-18): 11-12 코드 완료 시점의 절차서입니다.** 아래 "기대 결과"와 `[Azure 미확인]` 표기는 실행 전 기준이며 그대로 둡니다. 실제 실행에서 확인된 경로(Cloud Shell 의 `terraform apply`, MFA 우회)와 부활 절차는 `step12-azure.md`, 증거는 `docs/evidence/step12/`, 결과는 `docs/DEFERRED.md` P장(D-250~D-254)을 보세요.
+
 결정 근거: `docs/adr/0014-step12-azure-evidence-deploy.md`. 남은 것: `docs/DEFERRED.md` L장.
 **사용자가 Mac 에서 실행하는 순서입니다.** 명령은 한 줄씩이고, 구독 ID·키·이메일·내 IP·tfvars·state 는 채팅·git 어디에도 붙이지 않습니다.
 상태 표기: 아래 "기대 결과"는 모두 **[Azure 미확인]** 입니다(샌드박스는 Azure 에 접근할 수 없어 Terraform 문법·정적 규칙·스크립트 구문만 확인했습니다).

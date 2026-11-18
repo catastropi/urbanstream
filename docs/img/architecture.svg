@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" width="1200" height="640" font-family="'Noto Sans CJK KR','Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker></defs>
+<rect width="1200" height="640" fill="#FFFFFF"/>
+<text x="27" y="38" font-size="20" font-weight="700" fill="#1F2933">UrbanStream 데이터 흐름</text>
+<text x="27" y="60" font-size="12.5" fill="#52606D">수집·스트리밍·배치는 Mac(Docker Compose)에서 실행. Azure에는 점선 안의 서빙 계층만 스냅샷으로 올렸다가 삭제함.</text>
+<rect x="27" y="90" width="185" height="82" rx="8" fill="#E8F0FC" stroke="#3B6FB6" stroke-width="1.5"/>
+<text x="119.5" y="117" text-anchor="middle" font-size="16" font-weight="700" fill="#1F2933">공공 API 5종</text>
+<text x="119.5" y="139" text-anchor="middle" font-size="12.5" fill="#3E4C59">서울 도로소통·돌발</text>
+<text x="119.5" y="156" text-anchor="middle" font-size="12.5" fill="#3E4C59">버스 위치·도착, 기상청</text>
+<rect x="267" y="90" width="185" height="82" rx="8" fill="#E8F0FC" stroke="#3B6FB6" stroke-width="1.5"/>
+<text x="359.5" y="117" text-anchor="middle" font-size="16" font-weight="700" fill="#1F2933">Collector</text>
+<text x="359.5" y="139" text-anchor="middle" font-size="12.5" fill="#3E4C59">재시도·회로 차단·호출 예산</text>
+<text x="359.5" y="156" text-anchor="middle" font-size="12.5" fill="#3E4C59">원본 보관 (호스트 프로세스)</text>
+<rect x="507" y="90" width="185" height="82" rx="8" fill="#E4F4EF" stroke="#2F8F7A" stroke-width="1.5"/>
+<text x="599.5" y="117" text-anchor="middle" font-size="16" font-weight="700" fill="#1F2933">Kafka (KRaft)</text>
+<text x="599.5" y="139" text-anchor="middle" font-size="12.5" fill="#3E4C59">토픽 7개, 보존 72시간</text>
+<text x="599.5" y="156" text-anchor="middle" font-size="12.5" fill="#3E4C59">DLQ·audit 토픽, 단일 브로커</text>
+<rect x="747" y="90" width="185" height="82" rx="8" fill="#E4F4EF" stroke="#2F8F7A" stroke-width="1.5"/>
+<text x="839.5" y="117" text-anchor="middle" font-size="16" font-weight="700" fill="#1F2933">Spark Streaming</text>
+<text x="839.5" y="139" text-anchor="middle" font-size="12.5" fill="#3E4C59">Kafka → Bronze (Parquet)</text>
+<text x="839.5" y="156" text-anchor="middle" font-size="12.5" fill="#3E4C59">체크포인트로 이어받기</text>
+<rect x="987" y="90" width="185" height="82" rx="8" fill="#E4F4EF" stroke="#2F8F7A" stroke-width="1.5"/>
+<text x="1079.5" y="117" text-anchor="middle" font-size="16" font-weight="700" fill="#1F2933">Silver</text>
+<text x="1079.5" y="139" text-anchor="middle" font-size="12.5" fill="#3E4C59">정제·중복 제거·워터마크</text>
+<text x="1079.5" y="156" text-anchor="middle" font-size="12.5" fill="#3E4C59">좌표 변환, dq_flags 표시</text>
+<line x1="212" y1="131.0" x2="267" y2="131.0" stroke="#475569" stroke-width="1.8" marker-end="url(#a)"/>
+<line x1="452" y1="131.0" x2="507" y2="131.0" stroke="#475569" stroke-width="1.8" marker-end="url(#a)"/>
+<line x1="692" y1="131.0" x2="747" y2="131.0" stroke="#475569" stroke-width="1.8" marker-end="url(#a)"/>
+<line x1="932" y1="131.0" x2="987" y2="131.0" stroke="#475569" stroke-width="1.8" marker-end="url(#a)"/>
+<rect x="15" y="262" width="700" height="150" rx="10" fill="none" stroke="#C58A1B" stroke-width="1.5" stroke-dasharray="6 5"/>
+<text x="27" y="282" font-size="12.5" font-weight="700" fill="#8A5F0B">Azure 증거 배포 범위 (VM 1대, Terraform 리소스 8개, 11-12 스냅샷, 5일 가동 후 destroy)</text>
+<rect x="987" y="310" width="185" height="82" rx="8" fill="#E4F4EF" stroke="#2F8F7A" stroke-width="1.5"/>
+<text x="1079.5" y="337" text-anchor="middle" font-size="16" font-weight="700" fill="#1F2933">Spark 배치</text>
+<text x="1079.5" y="359" text-anchor="middle" font-size="12.5" fill="#3E4C59">Silver → 스테이징 Parquet</text>
+<text x="1079.5" y="376" text-anchor="middle" font-size="12.5" fill="#3E4C59">Airflow DAG 11개가 실행</text>
+<rect x="747" y="310" width="185" height="82" rx="8" fill="#FFF3DC" stroke="#C58A1B" stroke-width="1.5"/>
+<text x="839.5" y="337" text-anchor="middle" font-size="16" font-weight="700" fill="#1F2933">Python 로더</text>
+<text x="839.5" y="359" text-anchor="middle" font-size="12.5" fill="#3E4C59">Spark에는 DB 비밀을 안 넘김</text>
+<text x="839.5" y="376" text-anchor="middle" font-size="12.5" fill="#3E4C59">PK 기준 멱등 적재</text>
+<rect x="507" y="310" width="185" height="82" rx="8" fill="#FFF3DC" stroke="#C58A1B" stroke-width="1.5"/>
+<text x="599.5" y="337" text-anchor="middle" font-size="16" font-weight="700" fill="#1F2933">PostgreSQL + PostGIS</text>
+<text x="599.5" y="359" text-anchor="middle" font-size="12.5" fill="#3E4C59">Gold fact · Mart · ops</text>
+<text x="599.5" y="376" text-anchor="middle" font-size="12.5" fill="#3E4C59">마이그레이션 001~014</text>
+<rect x="267" y="310" width="185" height="82" rx="8" fill="#EFEBFB" stroke="#6A5ACD" stroke-width="1.5"/>
+<text x="359.5" y="337" text-anchor="middle" font-size="16" font-weight="700" fill="#1F2933">FastAPI</text>
+<text x="359.5" y="359" text-anchor="middle" font-size="12.5" fill="#3E4C59">엔드포인트 25개</text>
+<text x="359.5" y="376" text-anchor="middle" font-size="12.5" fill="#3E4C59">X-API-Key · 읽기 전용 계정</text>
+<rect x="27" y="310" width="185" height="82" rx="8" fill="#EFEBFB" stroke="#6A5ACD" stroke-width="1.5"/>
+<text x="119.5" y="337" text-anchor="middle" font-size="16" font-weight="700" fill="#1F2933">Streamlit</text>
+<text x="119.5" y="359" text-anchor="middle" font-size="12.5" fill="#3E4C59">화면 7개, API만 호출</text>
+<text x="119.5" y="376" text-anchor="middle" font-size="12.5" fill="#3E4C59">Tableau용 CSV 내보내기</text>
+<line x1="1079" y1="172" x2="1079" y2="310" stroke="#475569" stroke-width="1.8" marker-end="url(#a)"/>
+<text x="1089" y="232" font-size="12" fill="#52606D">매시 20분</text>
+<line x1="987" y1="351.0" x2="932" y2="351.0" stroke="#475569" stroke-width="1.8" marker-end="url(#a)"/>
+<line x1="747" y1="351.0" x2="692" y2="351.0" stroke="#475569" stroke-width="1.8" marker-end="url(#a)"/>
+<line x1="507" y1="351.0" x2="452" y2="351.0" stroke="#475569" stroke-width="1.8" marker-end="url(#a)"/>
+<line x1="267" y1="351.0" x2="212" y2="351.0" stroke="#475569" stroke-width="1.8" marker-end="url(#a)"/>
+<text x="27" y="448" font-size="14" font-weight="700" fill="#1F2933">운영·품질·배포</text>
+<rect x="27" y="462" width="267" height="82" rx="8" fill="#F1F3F5" stroke="#7A838C" stroke-width="1.5"/>
+<text x="160.5" y="489" text-anchor="middle" font-size="16" font-weight="700" fill="#1F2933">monitor 컨테이너</text>
+<text x="160.5" y="511" text-anchor="middle" font-size="12.5" fill="#3E4C59">소스·계층 상태, 수집 공백 감시</text>
+<text x="160.5" y="528" text-anchor="middle" font-size="12.5" fill="#3E4C59">Discord 알림 (Airflow와 별도)</text>
+<rect x="320" y="462" width="267" height="82" rx="8" fill="#F1F3F5" stroke="#7A838C" stroke-width="1.5"/>
+<text x="453.5" y="489" text-anchor="middle" font-size="16" font-weight="700" fill="#1F2933">DQ · 이상 탐지</text>
+<text x="453.5" y="511" text-anchor="middle" font-size="12.5" fill="#3E4C59">DQ 규칙 25개, 결과는 DB에 기록</text>
+<text x="453.5" y="528" text-anchor="middle" font-size="12.5" fill="#3E4C59">기준선 28일 미만은 candidate</text>
+<rect x="613" y="462" width="267" height="82" rx="8" fill="#F1F3F5" stroke="#7A838C" stroke-width="1.5"/>
+<text x="746.5" y="489" text-anchor="middle" font-size="16" font-weight="700" fill="#1F2933">CI/CD</text>
+<text x="746.5" y="511" text-anchor="middle" font-size="12.5" fill="#3E4C59">GitHub Actions: ci · weekly · release</text>
+<text x="746.5" y="528" text-anchor="middle" font-size="12.5" fill="#3E4C59">gitleaks, 액션 SHA 고정</text>
+<rect x="906" y="462" width="267" height="82" rx="8" fill="#F1F3F5" stroke="#7A838C" stroke-width="1.5"/>
+<text x="1039.5" y="489" text-anchor="middle" font-size="16" font-weight="700" fill="#1F2933">인프라 코드</text>
+<text x="1039.5" y="511" text-anchor="middle" font-size="12.5" fill="#3E4C59">Terraform: VM·VNet·NSG 등</text>
+<text x="1039.5" y="528" text-anchor="middle" font-size="12.5" fill="#3E4C59">8개 리소스 생성·삭제·재생성</text>
+<text x="27" y="580" font-size="12" fill="#52606D">한계: 수집 대상은 도로 링크 4개 · 버스 노선 1개 · 기상 격자 1개. API의 "현재" 값은 Gold 적재 주기 때문에 최대 약 80분 늦음(응답의 meta.as_of / stale로 표시).</text>
+<text x="27" y="600" font-size="12" fill="#52606D">Bronze에서 Silver를 다시 만드는 재처리 경로와 Kafka 다중 브로커 구성은 아직 없음 (docs/DEFERRED.md 참고).</text>
+</svg>

@@ -2,7 +2,7 @@
 
 "아직 안 한 것 / 확인 못 한 것 / 일부러 미룬 것"을 **어디에 추가할지**와 함께 적는 단 하나의 목록이다.
 새 채팅은 HANDOFF.md 와 함께 이 파일을 읽는다. 항목을 끝내면 상태를 바꾸고 날짜를 적는다 (지우지 않는다 — 이력이 곧 근거다).
-마지막 갱신: 2026-11-17 (Step 12 Azure 서빙 계층 배포·파괴·재배포·파괴 완료, P장 추가. 그 앞 갱신: 11-12 O장 · 11-05 Step 10 J장).
+마지막 갱신: 2026-11-18 (저녁: D-254·D-259 닫음, D-266·D-267 추가 · 문서 정합 정리: 결번 D-162·D-164 행 정리, 정의 없는 번호 참조 제거) · 그 앞 2026-11-17 (Step 12 Azure 서빙 계층 배포·파괴·재배포·파괴 완료, P장 추가. 그 앞 갱신: 11-12 O장 · 11-05 Step 10 J장).
 
 **상태:** ⏳ 미착수(할 일) · ❓ 확인 못 함(사실 여부 모름) · ⏸ 일부러 보류(이유와 재검토 시점 있음) · 👤 사용자 작업 · ✅ 완료(날짜)
 **출처:** H9 = HANDOFF 9장, A6 = ADR-0006, 11-03 = 이번 대화에서 발견
@@ -125,7 +125,7 @@
 | D-109 | 7c: Mac 실데이터 값 | ⏳ Mac | 돌발 영향·날씨×교통·표 통계가 Mac 에서 값이 나오는지 미확인. 샌드박스는 합성 데이터 통합 테스트 6개 + 변이 4건 + `airflow dags test` 3개(빈 데이터) | 런북 7c 4번 결과를 알려 주기 |
 | D-110 | 7c: `VACUUM` 은 하지 않음(autovacuum 에 맡김) | ⏸ | `gold_writer` 는 표 소유자가 아니고 `VACUUM` 은 함수 안에서 못 한다. `ANALYZE` 만 소유자 권한 함수 `ops.analyze_warehouse()` 로 한다. 밀리는지는 `ops.table_stats.n_dead_est` 로 본다 | `n_dead_est` 가 `n_live_est` 의 20% 를 넘는 표가 계속되면 소유자 계정으로 수동 VACUUM 또는 PG17 `MAINTAIN` 권한 |
 | D-111 | 7c: 기준선이 비교 대상 기간을 포함 | ⏸ | `mv_link_baseline` 은 전체 이력으로 만들어져 영향/날씨 비교 구간의 속도도 기준선에 들어간다. 데이터가 적을수록(지금은 몇 주 미만) 비율이 1.0 쪽으로 눌린다. 4주 미만이면 `provisional` | 4주 이상 쌓이면 문제 B·D 에 "해당 구간을 뺀 기준선" 옵션을 검토 |
-| D-112 | 7c: 돌발 → 링크 연결률이 낮을 수 있음 | ⏳ Mac | 수집 링크 4개뿐이라 대부분 `no_link`. 반경 300 m 와 24시간 확정 대기는 합의한 값이며 데이터로 검증 전. `absent_since` 는 해제 시각이 아니라 첫 미관측(ADR-0008 ⑧). 기상 PTY 눈 코드(2,3,6,7)는 코드표 기준 [추정] | 런북 7c 4번의 연결 건수 / 링크 확대(D-69 계열) 때 재검토 |
+| D-112 | 7c: 돌발 → 링크 연결률이 낮을 수 있음 | ⏳ Mac | 수집 링크 4개뿐이라 대부분 `no_link`. 반경 300 m 와 24시간 확정 대기는 합의한 값이며 데이터로 검증 전. `absent_since` 는 해제 시각이 아니라 첫 미관측(ADR-0008 ⑧). 기상 PTY 눈 코드(2,3,6,7)는 코드표 기준 [추정] | 런북 7c 4번의 연결 건수 / 링크 확대 때 재검토 |
 | D-113 | 7c: Bronze/Silver 파일 정리는 넣지 않음 | ⏸ | Airflow 는 해당 폴더를 읽기 전용으로만 본다(D-21). D-24 와 같은 항목 | 디스크 점검 시 별도 결정. 돌발 에피소드 원본 삭제는 `mart.incident_impact` 확정 이후에만(D-95) |
 | D-114 | 7c: 샌드박스 테스트가 관리자 계정이라 `gold_writer` 권한 누락을 놓침 | ✅ 수정 (11-04 Mac 발견) | `mart.mv_link_baseline` 읽기 권한이 없어 문제 B·D DAG 가 `permission denied` 로 재시도 루프. `sql/008_grant_baseline.sql` 추가 + 모든 빌더를 `gold_writer` 로 돌리는 테스트(`test_every_builder_runs_as_gold_writer`). 같은 종류의 누락은 앞으로 이 테스트가 잡는다 | Mac 에서 008 적용 후 재실행 (런북 7c) |
 | D-115 | 7c: 기준선 셀이 없는 시간대에서 `sufficient` 가 NULL → 날씨 DAG 실패 | ✅ 수정 (11-04 Mac 발견) | 기준선 MV 는 매시 갱신이라 가장 최근 시간대는 셀이 없다. `AND` 식이 NULL 이 되어 NOT NULL 위반. `coalesce(…, false)` + 회귀 테스트(`test_hour_without_baseline_cell_is_insufficient_not_null`). 같은 형태의 불리언 NOT NULL 열은 다른 빌더에서 점검함(문제 없음) | Mac 에서 다음 재시도 때 성공하는지 |
@@ -190,14 +190,12 @@
 ## J. Step 10 (대시보드 + Tableau) — 11-05
 
 모든 항목은 **샌드박스(Python 3.12 venv · 가짜 API · 헤드리스 Chrome 화면 확인)에서만 검증**했다. 실제 API·DB 데이터, Docker 이미지 빌드·기동, Mac 실측은 확인 전이다. 결정: `docs/adr/0012-step10-dashboard.md`, 실행: `docs/runbooks/step10-dashboard.md`.
-번호: 이 장은 D-165 부터. **D-162·D-164 는 이번 채팅의 HANDOFF 에 정의가 없어 여기서 정의하지 못했다**(아래 줄 참고).
+번호: 이 장은 D-165 부터. D-162·D-164 는 내용이 남아 있지 않아 2026-11-18 에 빈 자리 행을 정리했다(번호는 결번으로 둔다).
 
 | ID | 항목 | 상태 | 현재 알려진 것 | 확인 방법 / 어디에 |
 |---|---|---|---|---|
 | D-161 | Tableau Public + API 기반 CSV(HANDOFF 기록) | ✅ 결정 → 옵션 A 구현 | 사용자 선택(옵션 A): 로컬 CSV 생성만, 게시는 사용자가 직접. `scripts/export_tableau.py` | ADR D10-8, `tableau/README.md` |
-| D-162 | (HANDOFF 에 정의 없음) | ❓ 사용자 기억 필요 | 이번 채팅에서 내용을 확인하지 못했다 — 추측해서 채우지 않는다 | 사용자가 내용을 알려 주면 여기에 기록 |
 | D-163 | git push | 👤 | HANDOFF 기록대로(D-71 과 함께) 사용자 작업. `.gitignore` 로 `.env`·`data/`·`tableau/export/` 가 빠지는지는 시험으로 확인 | `git status` 로 `.env` 가 안 보이는지 확인 후 push |
-| D-164 | (HANDOFF 에 정의 없음) | ❓ 사용자 기억 필요 | D-162 와 같음 | 같음 |
 | D-165 | Mac 에서 확인할 것(대시보드 7) | 👤 | ① `scripts/stack.sh init-env` 가 `API_KEYS` 끝에 `DASHBOARD_API_KEY` 를 덧붙이고 두 번째 실행은 "변경 없음" ② `scripts/stack.sh up-dashboard` 이미지 빌드(python:3.12-slim-bookworm, `streamlit==1.66.1` 휠)·healthy ③ **읽기 전용 파일시스템에서 Streamlit 기동**(`HOME=/tmp`, tmpfs `/tmp`) — 컨테이너로는 시험하지 못했다 ④ Compose v2.10.2 에서 `dashboard` 서비스 ⑤ `docker stats` 메모리 — 한도 `DASHBOARD_MEM_LIMIT` 기본 512m 는 **[추정]** ⑥ 실제 API 로 7개 화면 열기, 사이드바 "API 호출(최근 1분)" ≤12 ⑦ `python scripts/export_tableau.py --preview` | `docs/runbooks/step10-dashboard.md` §1~5 |
 | D-176 | Mac 실측 발견: 버스 `route_id` 필수(11-06) | ✅ 수정 | 지도·버스 화면과 `export_tableau.py` 가 HTTP 422 `validation_error` 로 실패 → 원인은 API 가 `route_id` 를 필수로 요구하는데 대시보드가 안 보낸 것(내 버그). `DASHBOARD_BUS_ROUTE_ID`(기본 753번)로 수정, 가짜 API 가 스냅샷대로 검증하게 강화, 변이 3건 추가. **교훈:** 계약 시험이 필드 이름뿐 아니라 필수 매개변수도 대조해야 한다 | ADR D10-10 |
 | D-177 | 노선이 1개로 고정 | ⏸ | API 에 노선 목록 엔드포인트가 없어 노선을 화면에서 고를 수 없다. 환경 변수로만 바꾼다 | 노선을 늘리면 `/v1` 에 목록 엔드포인트 추가 |
@@ -219,7 +217,7 @@
 ## K. Step 11 (시험 계층 + GitHub Actions CI/CD) — 11-08
 
 **워크플로는 샌드박스에서 실행할 수 없어서 GitHub 에서 한 번도 돌려 보지 못했다.** 확인한 것은 도구·시험·정적 점검뿐이다(814 passed / 3 skipped, 변이 `mutation_ci` 35 · `mutation_dashboard` 33 · `mutation_api` 30 전부 검출). 결정: `docs/adr/0013-step11-ci-cd.md`, 실행: `docs/runbooks/step11-ci.md`.
-번호: 이 장은 D-183 부터 (D-181·D-182 는 사용자 소유 항목으로 이 장 밖).
+번호: 이 장은 D-183 부터.
 
 | ID | 항목 | 상태 | 현재 알려진 것 | 확인 방법 / 어디에 |
 |---|---|---|---|---|
@@ -229,7 +227,7 @@
 | D-186 | CI/CD 범위 밖으로 둔 것 | ⏸ | ① Kafka→Spark→Gold 전체 e2e(비용 큼) ② Airflow·Spark 이미지는 CI 빌드·GHCR 게시 안 함 ③ arm64 이미지 없음(Mac 은 로컬 빌드) ④ Trivy/SBOM/이미지 서명 없음 ⑤ 배포(서버 없음) | 필요해질 때 ADR |
 | D-187 | `api-contract-watch`(실제 공공 API 주기 호출로 응답 모양 변화 감시) | ⏸ | 하지 않음: 실제 키를 CI Secrets 에 넣어야 하고(결정 2 와 충돌), 호출 한도를 쓴다. 대안: 수집기가 이미 `rejects`·스키마 위반을 감사 로그에 남긴다 | 키를 CI 에 둘 의사가 생기면 별도 결정 |
 | D-188 | Actions 사용량(분) | ✅ 11-09 | 실측: **Actions Linux 128분(Nov 7~9), $0.006/분, 총액 $0.77, 청구 $0**. 오늘 `ci`·`weekly`·`release` 를 여러 번(실패·재실행 포함) 돌린 값이라 평소 PR 비용은 이보다 작을 가능성이 크다 [추정]. 월 포함량 2,000분의 약 6.4%. `weekly` 1회 소요 분은 아직 모름 | Billing → Usage |
-| D-189 | CI 첫 초록불로 닫을 수 있는 것 | ✅ 11-09 | `test-pg` 초록 → D-181(PG17/PostGIS 3.6.1 에서 시험) 닫음, D-160·D-174(CI 반영) 닫음. D-191(amd64 PostGIS 이미지)도 서비스 컨테이너가 떠서 해소 | — |
+| D-189 | CI 첫 초록불로 닫을 수 있는 것 | ✅ 11-09 | `test-pg` 초록 → PG17/PostGIS 3.6.1 에서의 시험 항목 닫음, D-160·D-174(CI 반영) 닫음. D-191(amd64 PostGIS 이미지)도 서비스 컨테이너가 떠서 해소 | — |
 | D-190 | Spark 컨테이너 시험이 새 `pytest.ini` 로 도는지 | ✅ 11-09 | 이미지 재빌드 후 `scripts/spark_test.sh` **114 passed / 4 skipped**(Postgres 시험은 컨테이너에 DB 가 없어 skip). 처음 두 번 실패: ① 컨테이너 pytest 는 시스템 패키지(구버전, Python 3.10)라 `-p layers_plugin` 을 PYTHONPATH 적용 전에 import 하다 실패 ② `pytest.ini` 의 `pythonpath` 를 무시해 `pg_support` import 실패(②는 Step 11 이전부터 있던 잠복 문제로 [추정] — 두 파일이 컨테이너에서 돈 기록이 없다). 래퍼 `docker/spark-base/urbanstream-pytest.sh` 가 `tests/support` 를 PYTHONPATH 에 넣고 `-o addopts=-ra` 로 덮어쓰도록 수정, 정적 시험·변이 2건 추가 | 런북 |
 | D-191 | PostGIS 이미지의 linux/amd64 매니페스트 | ✅ 11-09 | `test-pg` 서비스 컨테이너가 러너(amd64)에서 기동·시험 통과 | — |
 | D-192 | 실제 docker 빌드·이미지 검사(`image-guard`)·GHCR 푸시 | ✅ 11-09 | `ci` 의 `docker-build` 초록, `release` 로 `urbanstream-api`·`urbanstream-dashboard` 가 GHCR 에 올라감(태그 `0.1.0`·`sha-<7>`, private). 새 패키지 첫 푸시는 한 번 거부된다(D-205) | — |
@@ -321,15 +319,17 @@ Step 12(Azure 서빙 계층 최소 증거 배포)는 **끝났다**: 증거 `docs
 | D-251 | **Terraform state 가 Mac 에 없었다 / 어디에도 없다** | ✅ 우회 / ⏸ 재발 방지 선택 | Mac `terraform.tfstate`(592바이트, `serial 4`, `resources: []`, 11-12 15:30) 이후 VM 은 15:57 에 생겼다. Mac 에서 `plan` 은 `8 to add`(실제로는 이미 존재). Cloud Shell 홈도 비어 있었다. 첫 apply 의 경로(Cloud Shell 로 추정, `cloud.sh` 주석의 "3-B")와 state 위치는 **확인하지 못했다 [미확인]**. 처리: `apply` 하지 않고 리소스 그룹을 `az group delete` 로 지운 뒤 Cloud Shell 에서 처음부터 apply → plan → destroy 를 다시 해 증거를 만들었다. **교훈: `plan` 이 "전부 추가"라고 하면 먼저 `az group exists` 로 현실을 본다. apply 하면 충돌·중복 위험** | 선택: apply 직후 `terraform.tfstate` 를 안전한 곳에 복사 / 원격 backend(Storage, 비용 거의 0). 런북 7절 |
 | D-252 | Mac 의 `az` 가 MFA 요구(`AADSTS50076`) | ✅ 우회 | 학교 계정 조건부 액세스로 Mac `az group delete` 가 막힘. **Cloud Shell(포털에서 이미 로그인)** 에서 `az`·`terraform` 을 실행하면 된다. 올릴 파일: `main.tf`·`variables.tf`·`outputs.tf`·`versions.tf`·`cloud-init.yaml.tftpl`·`terraform.tfvars`·SSH **공개키**(개인키·tfstate 는 올리지 않음). Cloud Shell 홈은 비어 있었다 | 런북 3절 |
 | D-253 | **부활 검증**(apply → `cloud.sh up` → `cloud.sh tunnel`) | ✅ 2026-11-17 (사용자 보고, 캡처 없음) | 코드 한 벌로 만들고 올리고 접속했다. 막힌 곳: `cloud.sh up` 이 `ssh ... Operation timed out`(NSG 가 현재 IP 를 막음 — 허용 IP 는 `tfvars` 의 하나뿐). 안내대로 `allowed_ssh_cidr` 를 고쳐 apply 한 뒤 통과(원인 확정 기록 없음 [추정]). cloud-init 은 Docker 만 설치(앱·스냅샷은 `cloud.sh up`). **소요 시간 미측정 [미측정]**, `cloud.sh` 의 `ship` 이름은 주석에만 남아 있고 실제 서브커맨드는 `up`(주석 불일치, 사소) | 런북 4·6절 |
-| D-254 | **비용 최종 확인** | 👤 대기 | destroy(11-17 ~16:45) 뒤 일별 비용이 0 으로 떨어졌는지, 11-17 의 두 번째 VM(수 시간) 비용이 얼마인지 보지 않았다 [미확인]. 크레딧 잔액도 재확인 안 함(11-11 ₩101,300 에서 Step 12 약 ₩17.6K+α·Olist 월 ₩17.4K 가 빠진다 [추정]) | 11-19경 포털 비용 분석(범위: 내 계정, RG 필터) + Education Hub 잔액. D-227(Olist)과 같이 판단 |
+| D-254 | **비용 최종 확인** | ✅ 2026-11-18 사용자 확인: 비용 0(destroy 이후 청구 없음) | destroy(11-17 ~16:45) 뒤 일별 비용이 0 으로 떨어졌는지, 11-17 의 두 번째 VM(수 시간) 비용이 얼마인지 보지 않았다 [미확인]. 크레딧 잔액도 재확인 안 함(11-11 ₩101,300 에서 Step 12 약 ₩17.6K+α·Olist 월 ₩17.4K 가 빠진다 [추정]) | 11-19경 포털 비용 분석(범위: 내 계정, RG 필터) + Education Hub 잔액. D-227(Olist)과 같이 판단 |
 | D-255 | **Bronze `OffsetOutOfRange` + `_spark_metadata` 함정** | ✅ 복구 / ⏸ 자동화 | 11-12 17:05 Mac 을 끈 뒤 11-16 10:08 에 재기동 → `spark-bronze` unhealthy: Kafka 보존 72시간이 지나 체크포인트 offset 의 데이터가 사라짐(`failOnDataLoss=true`, `streaming/bronze.py` 117줄 — 유실을 숨기지 않는 설계). 체크포인트만 옮기면 **새 데이터가 조용히 버려진다**: Spark FileStreamSink 는 `_spark_metadata` 의 마지막 커밋 batch id(2034) 이하의 새 batch(72…)를 "이미 처리됨"으로 건너뛴다. **체크포인트와 `data/bronze/<표>/_spark_metadata` 를 같이 옮겨야 한다.** 복구한 표: bus_arrival·seoul_incident·seoul_traffic(`data/_old/` 로 이동), 새 `event_date=2026-11-16` 폴더·Discord "해소" 로 확인. **내(Claude)가 처음에 체크포인트만 안내해 새 batch 가 건너뛰어진 것을 알아차렸다(sink 기록 2034 대 체크포인트 72) — 정정 완료.** 영구 결측: 11-12 17:05 ~ 재기동(11-16 ~10:30) 구간 중 Kafka 에 없던 것(수집기도 꺼져 있었다) | `docs/runbooks/step4-bronze.md` §8, `mac-on-off.md` §5. 자동화 후보: `BRONZE_FAIL_ON_DATA_LOSS` 환경 변수화(보류) |
 | D-256 | **Kafka 보존 72시간 < 정지 시간** | ⏸ 선택 제안(미결정) | `config/topics.yaml` 의 `retention_ms: 259200000`(72시간); DLQ·audit 은 7일. 72시간을 넘겨 끄면 Bronze 가 못 따라가 복구 절차(D-255)가 필요하다. 상향(예: 7일)은 디스크를 더 쓴다. 토픽 단위로 실제 적용됐는지는 직접 확인하지 않았다 [미확인] | `kafka-configs --describe` 로 토픽 설정 확인 후 사용자 결정. 대안: 길게 끌 때만 절차를 따른다 |
 | D-257 | **11-17 깨어난 뒤 Airflow scheduler 메모리 3.99 GiB, `docker compose stop` 실패** | ✅ 처리 / ⏸ 구조 해법 | 모니터를 약 하루 덮은 채 켜서(11-17 14:08) scheduler 가 한도 직전(3.99 GiB/4g). `docker compose stop` 이 daemon "did not receive an exit event" 로 실패 → `docker kill`/기다림 후 `docker ps -a` 로 `Exited (137)` 확인, Docker Desktop 재시작 없이 복구. 근본은 Mac 덮개 닫힘(D-222) + 깨어난 직후 Airflow 가 밀린 실행을 몰아서 돎(D-212 연쇄). **재기동 이후 안정성·메모리는 사용자가 보고하지 않았다 [미확인]** | `scripts/stack.sh stats`. D-212 의 해법(Gold Spark 를 scheduler 밖 일회성 컨테이너로) 은 계속 보류 |
-| D-258 | `silver_verify` 가 `1800 s` 타임아웃(긴 정지 뒤 `silver_reconcile_daily`) | ❓ 재발 여부 미확인 | 11-12 정지 뒤 04:30 `silver_reconcile_daily` attempt=2 로그에서 `silver_verify` 1800초 제한 초과. 긴 정지 뒤 데이터가 많아 오래 걸리는 것으로 보인다 [추정]. 이후 실행 성공 여부 미확인 | Airflow UI 의 `silver_reconcile_daily` 최근 실행. 필요하면 제한 상향 |
-| D-259 | **Gold 신선도·`gold_daily` 성공 여부** | 👤 미확인 | `gold_daily`(01:00 KST) 마지막 성공이 11-11 13:39 로 DQ 알림에 나왔다. 11-12 이후 정지·재기동 후 `ops.load_run`(`job=gold_load`) 이 최근 구간을 덮는지, 다운스트림 `require_recent_load`(36시간 창) 를 통과하는지 보지 않았다 [미확인]. 대시보드 건강 화면의 마트 시각으로 확인 | 사용자: 대시보드 이상·건강 화면, Airflow UI |
+| D-258 | `silver_verify` 가 `1800 s` 타임아웃(긴 정지 뒤 `silver_reconcile_daily`) | ❓ 재발 여부 미확인(사용자가 11-19 에 Airflow UI 확인 예정) | 11-12 정지 뒤 04:30 `silver_reconcile_daily` attempt=2 로그에서 `silver_verify` 1800초 제한 초과. 긴 정지 뒤 데이터가 많아 오래 걸리는 것으로 보인다 [추정]. 이후 실행 성공 여부 미확인 | Airflow UI 의 `silver_reconcile_daily` 최근 실행. 필요하면 제한 상향 |
+| D-259 | **Gold 신선도·`gold_daily` 성공 여부** | ✅ 2026-11-18 | `gold_daily`(01:00 KST) 마지막 성공이 11-11 13:39 로 DQ 알림에 나왔다. 11-12 이후 정지·재기동 후 `ops.load_run`(`job=gold_load`) 이 최근 구간을 덮는지, 다운스트림 `require_recent_load`(36시간 창) 를 통과하는지 보지 않았다 [미확인]. 대시보드 건강 화면의 마트 시각으로 확인 | `ops.load_run`(status=ok) 확인: `gold_daily` 마지막 성공 11-18 01:02 KST, `gold_intraday` 11-18 14:28 KST. 11-12 이후 재기동 뒤에도 적재가 이어짐 |
 | D-260 | **덮개를 닫고 돌리기(`pmset disablesleep`)** | ✅ 문서(11-17) / ⏸ 실측 | `sudo pmset -a disablesleep 1` 후 `0` 으로 되돌림. 전원 연결·통풍 필수(닫힌 Mac 은 열 배출이 나쁘다 [추정]). 외부 모니터 연결도 대안. 화면만 꺼지는 것(덮개 열림)은 `caffeinate -i` 로 충분. **덮개 닫고 하루 이상 돌린 실측은 없다 — 11-16~17 에 덮개를 하루 가까이 덮어 둔 것은 절전 상태였던 것으로 보인다 [추정]** | `docs/runbooks/mac-on-off.md` §4 |
 | D-261 | **수집 공백 기록(포트폴리오 숫자 제외 구간)** | ⏸ | 11-12 ~17:05 ~ 11-16 ~10:30 은 수집·처리가 거의 없다(약 4일 17시간). 11-07(D-222 절전)·11-09~10(OOM)도 결측이 있다. 하루 수집 레코드 수·성공률·DQ 통과율을 7-13 에 쓸 때 **이 구간을 평균에서 빼고 명시**한다 | 7-13 숫자 모음. 정확한 시각은 `data/bronze` 폴더의 `event_date` 와 Discord 알림으로 |
 | D-262 | **증거 이미지 원본 관리** | ✅ 2026-11-17 | 저장소에는 **마스킹한 이미지만** 넣었다(계정 이름 3곳·허용 SSH IP·VM 공인 IP). 원본(채팅 업로드)은 저장소에 두지 않는다. 마스킹은 불투명 박스 — 블러는 복원될 수 있어 쓰지 않았다. 처음 만든 apply 화면은 박스 위치가 틀려 IP 가 남아 있어 **다시 가리고 눈으로 확인**했다. 향후 캡처: `terraform plan` 의 `source_address_prefix`·`apply` 의 `public_ip` 줄을 가린다 | `docs/evidence/step12/` |
 | D-263 | 11-09~11-11 에 올린 이전 스크린샷(7장) | ❓ 정리 안 함 | 세션 업로드 폴더에 Step 12 이전 시기 이미지 7장이 더 있다(예: 11-09~11-11 업로드). Step 12 증거가 아니라고 보고 저장소에 넣지 않았고 내용도 이번에 열어 보지 않았다 | 사용자가 포트폴리오에 쓸 것이 있으면 알려 주면 마스킹해 `docs/evidence/` 에 추가 |
 | D-264 | 🔴 **Step 12 코드가 샌드박스·zip 에 없다** | ✅ 2026-11-17 해소 (전체 저장소 zip 으로 점검·정리) | 이 저장소 사본(샌드박스)에는 `infra/`(Terraform), `scripts/cloud.sh`, `scripts/cloud_remote.sh`, `docker-compose.cloud.yml`, ADR-0014, Step 12 시험이 **없다**. 사용자 Mac 에는 있다(`infra/terraform/{main,variables,outputs,versions}.tf`·`cloud-init.yaml.tftpl`·`terraform.tfvars.example`, `scripts/cloud.sh`·`cloud_remote.sh` 확인됨; `docker-compose.cloud.yml`·시험·변이는 `cloud.sh` 가 참조하므로 있을 것으로 보이나 내용은 못 봄 [미확인]). 그래서 11-17 마무리 때는 **전체 zip 을 만들지 않고 문서만 담은 패치 zip** 을 보냈다 — 전체 zip 을 풀면 샌드박스의 오래된 `.gitignore`·`layers_plugin.py`·`mutation_ci.py` 가 Mac 의 Step 12 판을 덮어쓸 위험이 있다(`.gitignore` 에서 tfstate·tfvars 제외가 사라지면 IP 포함 파일이 커밋될 수 있다). Step 12 코드의 시험·변이 시험·`ruff`·`ci_checks` 통과는 **이 샌드박스에서 검증하지 못했다** | 사용자가 위 파일 목록을 첨부(tfstate·tfvars·`.terraform` 제외)하면 병합 후 시험·변이 검증과 진짜 전체 zip 을 만든다 |
 | D-265 | Step 12 비밀 파일이 git 에서 제외되는지 | 👤 확인 | 제외돼야 하는 것: `infra/terraform/terraform.tfvars`(허용 IP 포함), `terraform.tfstate*`, `.terraform/`. 커밋해야 하는 것: `.terraform.lock.hcl`(Terraform 이 권장). 확인: `git check-ignore -v infra/terraform/terraform.tfvars infra/terraform/terraform.tfstate` 가 각각 규칙을 보여 줘야 하고 `git status -sb` 에 이 파일들이 안 보여야 한다. 증거·문서에는 IP 를 넣지 않았다 | 사용자 Mac |
+| D-266 | 장기 연속 수집 계획(4주 이상) | ⏳ 👤 | 11-18 사용자: 하루 이상 켜 둔 적이 없어(이동 등) 곧 오래 돌릴 예정. 이상 탐지 기준선이 28일 미만이면 `candidate` 라 4주 이상 이어야 한다(ADR-0010 D8-11). 시작 전 확인: Kafka 보존 72시간(D-256, 미결정), Mac 절전 방지(D-260, `mac-on-off.md`), Airflow 메모리(D-211) | 수집 후 README 규모 표 갱신(조회문은 공개 가이드) |
+| D-267 | 온전히 채워진 수집일 | ✅ 2026-11-18 사용자 확인 | 11-03~11-18 중 하루가 온전히 채워진 날은 11-04·05·06 뿐. README 의 규모 수치는 최댓값·가동일수로 적고 "하루 평균"은 쓰지 않았다. 장기 수집 뒤 다시 계산(D-266) | — |

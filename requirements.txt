@@ -1,10 +1,12 @@
 # UrbanStream 실행 의존성. (Step 0 스모크 테스트: requests, python-dotenv / Step 3 Collector: pyyaml, confluent-kafka)
 # 이후 단계(Spark, Airflow, FastAPI 등)에서 계속 추가될 예정.
-requests>=2.31.0
-python-dotenv>=1.0.0
-pyyaml>=6.0
-confluent-kafka>=2.6
+# 정확한 고정(==)이 아니라 호환 범위(상한 = 다음 메이저)다: CI 의 dags 잡이 Airflow 공식 constraints 와 함께 이 파일을 설치하는데,
+# constraints 가 confluent-kafka·pyarrow·python-dotenv 를 자기 버전으로 못 박아 두어 ==  를 쓰면 충돌한다. 시험해 본 버전은 requirements-lock.txt.
+requests>=2.31.0,<3
+python-dotenv>=1.0.0,<2
+pyyaml>=6.0,<7
+confluent-kafka>=2.6,<3
 # Step 6 (Gold 적재·마이그레이션은 호스트 Python 에서 실행)
-psycopg[binary]>=3.2
-pyarrow>=15
-openpyxl>=3.1
+psycopg[binary]>=3.2,<4
+pyarrow>=15,<27
+openpyxl>=3.1,<4
