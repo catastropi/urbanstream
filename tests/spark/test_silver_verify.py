@@ -121,3 +121,100 @@ def test_incident_sample_lists_longest_first_with_converted_coordinates(spark):
     sample = V.incident_sample(silver_of(b, "seoul_incident"), n=2)
     assert [x["acc_id"] for x in sample] == ["long", "short"] and sample[0]["long"] is True
     assert abs(sample[0]["lat"] - 37.56303) < 1e-4
+
+
+# ---------------------------------------------------------------- 비교 구간 (D-258)
+
+def _old_ghost_case(spark):
+    """11-20 의 정상 행들 + 11-03 에만 있는 Silver 초과 행(Bronze 의 복구 전 구간이 안 보이는 상황을 흉내)."""
+    new = [{"dedup_key": f"n{i}", "event_time": at(i, day=20), "fetched_at": at(i + 5, day=20), "ingest_id": f"n{i}"} for i in range(4)]
+    new.append({"dedup_key": "tail", "event_time": at(9000, day=20), "fetched_at": at(9000, day=20), "ingest_id": "t"})
+    b = bronze(spark, "bus_position", new)
+    ghost = bronze(spark, "bus_position", [{"dedup_key": "old", "event_time": at(0), "fetched_at": at(5), "ingest_id": "o"}])
+    return b, silver_of(b, "bus_position").unionByName(silver_of(ghost, "bus_position"))
+
+
+def test_window_excludes_old_silver_only_rows_that_fail_a_full_comparison(spark):
+    from datetime import datetime
+    b, s = _old_ghost_case(spark)
+    t = table_of("bus_position")
+    full = V.compare(b, s, t)
+    assert not full["ok"] and full["extra"] == 1 and full["since"] is None
+    win = V.compare(b, s, t, since=datetime(2026, 11, 10))
+    assert win["ok"] and win["extra"] == 0 and win["bronze_total"] == 5 and win["since"] == datetime(2026, 11, 10)
+
+
+def test_window_still_catches_a_missing_row_inside_the_window(spark):
+    from datetime import datetime
+    b, s = _old_ghost_case(spark)
+    r = V.compare(b, s.filter(F.col("dedup_key") != "n2"), table_of("bus_position"), since=datetime(2026, 11, 10))
+    assert not r["ok"] and r["missing"] == 1
+
+
+def test_format_line_says_which_window_was_compared(spark):
+    from datetime import datetime
+    b, s = _old_ghost_case(spark)
+    t = table_of("bus_position")
+    assert "구간 전체 이력" in V.format_line(V.compare(b, s, t))
+    assert "구간 fetched_at ≥ 2026-11-10 00:00:00Z" in V.format_line(V.compare(b, s, t, since=datetime(2026, 11, 10)))
+
+
+# ---------------------------------------------------------------- 한 번 읽고 재사용 + 시간 검사에도 구간 적용 (D-258, 2026-11-19 2차)
+
+def test_prewindowed_compare_gives_the_same_result_as_windowing_inside_compare(spark):
+    from datetime import datetime
+    b, s = _old_ghost_case(spark)
+    t = table_of("bus_position")
+    since = datetime(2026, 11, 19, 15, 0, 0)
+    a = V.compare(b, s, t, since=since)
+    cb, cs = V.cached(V.windowed(b, "event_date", since), since), V.cached(V.windowed(s, "event_date", since), since)
+    try:
+        c = V.compare(cb, cs, t, since=since, prewindowed=True)
+    finally:
+        cb.unpersist(), cs.unpersist()
+    keys = ("ok", "bronze_total", "bronze_ok", "silver_rows", "missing", "extra", "dup_rows", "cutoff")
+    assert {k: a[k] for k in keys} == {k: c[k] for k in keys}
+
+
+def test_cached_is_a_noop_without_a_window(spark):
+    b = bronze(spark, "bus_position", rows(2))
+    assert V.cached(b, None) is b and V.cached(None, None) is None
+
+
+def _write_tables(spark, tmp_path):
+    """Bronze/Silver 를 파티션 폴더로 쓴다. 11-03 에는 '미래 시각' 위반이 있고 11-20 에는 정상 행만 있다."""
+    old = [{"dedup_key": "o", "event_time": at(500), "fetched_at": at(100), "ingest_id": "o"}]                 # 11-03, 미래 시각 위반
+    new = [{"dedup_key": f"n{i}", "event_time": at(i, day=20), "fetched_at": at(i + 5, day=20), "ingest_id": f"n{i}"} for i in range(4)]
+    new.append({"dedup_key": "tail", "event_time": at(9000, day=20), "fetched_at": at(9000, day=20), "ingest_id": "t"})
+    b = bronze(spark, "bus_position", old + new)
+    b.write.mode("overwrite").partitionBy("event_date").parquet(str(tmp_path / "bronze" / "bus_position"))
+    silver_of(b, "bus_position").write.mode("overwrite").partitionBy("event_date").parquet(str(tmp_path / "silver" / "silver_bus_position"))
+
+
+def test_main_applies_the_window_to_time_checks_too(spark, tmp_path, monkeypatch, capsys):
+    """구간을 주면 구간 밖(옛 이력)의 시간 위반은 보지 않고, 구간을 안 주면 본다. 이전에는 time_checks 가 Silver 전체를 읽었다."""
+    _write_tables(spark, tmp_path)
+    from pathlib import Path
+    monkeypatch.setenv("SILVER_BRONZE_ROOT", str(tmp_path / "bronze"))
+    monkeypatch.setenv("SILVER_ROOT", str(tmp_path / "silver"))
+    monkeypatch.setenv("SILVER_CONFIG_DIR", str(Path(__file__).resolve().parents[2] / "config"))
+    monkeypatch.delenv("SILVER_VERIFY_LOOKBACK_DAYS", raising=False)
+    monkeypatch.setenv("SILVER_VERIFY_SINCE", "2026-11-19")
+    assert V.main() == 0
+    out = capsys.readouterr().out
+    assert "silver_bus_position" in out and "미래 시각 0" in out and "구간 fetched_at ≥" in out
+    monkeypatch.delenv("SILVER_VERIFY_SINCE")
+    assert V.main() == 1
+    assert "미래 시각 1" in capsys.readouterr().out
+
+
+def test_incident_bronze_is_not_pruned_by_event_date_because_old_incidents_keep_being_observed(spark):
+    """돌발 Bronze 의 event_date 는 발생 시각 날짜다. 오래된 장기 돌발도 최근에 관측되므로, 이를 파티션으로 거르면 Silver 쪽만 남아 '초과'로 보인다."""
+    from datetime import datetime
+    obs = [{"dedup_key": "long", "event_time": at(0, day=3), "fetched_at": at(10 + 120 * i, day=20), "ingest_id": f"call{i}"} for i in range(3)]   # 11-03 에 발생, 11-20 에 관측
+    obs.append({"dedup_key": "tail", "event_time": at(9000, day=20), "fetched_at": at(9000, day=20), "ingest_id": "t"})
+    b = bronze(spark, "seoul_incident", obs)
+    t = table_of("seoul_incident")
+    r = V.compare(b, silver_of(b, "seoul_incident"), t, since=datetime(2026, 11, 19, 15, 0, 0))
+    assert r["ok"] and r["extra"] == 0 and r["missing"] == 0 and r["silver_rows"] == 3
+    assert V.bronze_partition_col(t) is None and V.bronze_partition_col(table_of("bus_position")) == "event_date"

@@ -53,3 +53,37 @@ def test_bad_config_fails_loudly(tmp_path, mutate, msg):
 def test_paths_come_from_env_but_rules_do_not():
     c = SilverConfig.from_env({"SILVER_ROOT": "/x", "SILVER_LONG_TERM_DAYS": "99"})
     assert c.silver_root == "/x" and c.long_term_days == 7.0
+
+
+# ---------------------------------------------------------------- silver_verify 비교 구간 (D-258)
+
+from datetime import datetime  # noqa: E402
+
+from streaming.silver_config import verify_since  # noqa: E402
+
+NOW = datetime(2026, 11, 19, 12, 0, 0)
+
+
+def test_verify_since_defaults_to_full_history():
+    assert verify_since({}, NOW) is None
+    assert verify_since({"SILVER_VERIFY_LOOKBACK_DAYS": " ", "SILVER_VERIFY_SINCE": ""}, NOW) is None
+
+
+def test_verify_since_lookback_days_counts_back_from_now():
+    assert verify_since({"SILVER_VERIFY_LOOKBACK_DAYS": "3"}, NOW) == datetime(2026, 11, 16, 12, 0, 0)
+    assert verify_since({"SILVER_VERIFY_LOOKBACK_DAYS": "0.5"}, NOW) == datetime(2026, 11, 19, 0, 0, 0)
+
+
+def test_verify_since_date_is_kst_midnight_in_utc():
+    assert verify_since({"SILVER_VERIFY_SINCE": "2026-11-16"}, NOW) == datetime(2026, 11, 15, 15, 0, 0)
+
+
+def test_verify_since_uses_the_later_when_both_are_given():
+    e = {"SILVER_VERIFY_SINCE": "2026-11-18", "SILVER_VERIFY_LOOKBACK_DAYS": "3"}
+    assert verify_since(e, NOW) == datetime(2026, 11, 17, 15, 0, 0)
+
+
+@pytest.mark.parametrize("bad", ["0", "-1"])
+def test_verify_since_rejects_non_positive_lookback(bad):
+    with pytest.raises(ValueError):
+        verify_since({"SILVER_VERIFY_LOOKBACK_DAYS": bad}, NOW)

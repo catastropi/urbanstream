@@ -21,7 +21,7 @@ FastAPI와 Streamlit 대시보드로 보여 주는 개인 데이터 엔지니어
 | Silver | 타입 변환, event time 워터마크, `dedup_key` 중복 제거, 좌표 변환, 이상값 표시 | `streaming/silver*.py` |
 | Gold | Spark 배치가 스테이징 Parquet을 만들고 Python 로더가 PostgreSQL에 적재. Star Schema + 마트 | `batch/`, `sql/` |
 | 오케스트레이션 | Airflow DAG 11개(Gold 적재, 혼잡 기준선, 돌발 영향, 날씨·교통, DQ 리포트, 이상 탐지 등) | `dags/` |
-| 품질·감시 | DQ 규칙 25개, 이상 탐지, 소스·계층 상태 감시, Discord 알림 | `src/urbanstream/{dq,monitor,notify}` |
+| 품질·감시 | DQ 규칙 24개(`config/dq_rules.yaml`), Silver 행 수 대조, 이상 탐지, 소스·계층 상태 감시, Discord 알림 | `src/urbanstream/{dq,monitor,notify}` |
 | 서빙 | FastAPI 엔드포인트 25개, 대시보드 7개 화면, Tableau용 CSV | `api/`, `dashboard/` |
 | 배포·검증 | GitHub Actions(ci·weekly·release), Terraform(Azure) | `.github/`, `infra/terraform/` |
 
@@ -62,7 +62,7 @@ Azure에 올렸던 서빙 계층에서 캡처한 화면입니다(11-12 시점 �
 | 수집 호출 | 소스 5종 합계 15,252건. 성공률은 4개 소스가 94~96%이고, 기상청은 발표 직후 `NO_DATA` 응답을 실패로 센 기간이 있어 73%로 낮게 나옴 |
 | Gold 적재 시간 | gold_intraday 평균 3초(최대 19초), gold_daily 평균 4초(최대 9초). 데이터가 작아서 나온 값이라 확장성의 근거는 아님 |
 | API 응답(로컬, 20회) | 중앙값 약 29 ms, 첫 호출 1.85초. 응답 캐시가 있고 `/v1/traffic/current` 하나만 측정 |
-| 시험 | 시험 함수 691개(64개 파일, 파라미터 확장 전), 변이 시험 65건 전부 검출(11-17 점검). 로컬 Mac 실행은 551 passed / 89 skipped이며, 의존성이나 DB가 없으면 건너뛰는 시험이 있어(예: pyproj) 전체는 CI에서 돌림 |
+| 시험 | 시험 함수 702개(64개 파일, 파라미터 확장 전), 변이 시험 65건 전부 검출(11-17 점검). 로컬 Mac 실행은 551 passed / 89 skipped이며, 의존성이나 DB가 없으면 건너뛰는 시험이 있어(예: pyproj) 전체는 CI에서 돌림 |
 | 수집 실측(11-03) | 호출 실패·재시도 0, 발행 수 = 레코드 수, 약 175건/분 |
 
 ## 운영하면서 겪은 문제

@@ -98,5 +98,5 @@ sudo pmset -a disablesleep 0
 ## 5. 72시간보다 오래 꺼 뒀다 켰을 때
 Kafka 보존 72시간(DLQ·audit 7일)이 지나서 `spark-bronze` 가 `OffsetOutOfRange` 로 unhealthy 가 될 수 있다. 그 구간의 데이터는 어디에도 없다(수집기도 꺼져 있었다). **복구는 `docs/runbooks/step4-bronze.md` §8** — 체크포인트와 `_spark_metadata` 를 **함께** 옮겨야 한다. 켠 뒤 `up-silver` 가 unhealthy 로 끝나면 먼저 로그에서 `OffsetOutOfRange` 부터 찾는다.
 
-추가로 긴 정지 뒤에는: `up-airflow` 직후 scheduler 메모리(`scripts/stack.sh stats`)를 본다. Airflow 는 `catchup=False` 라 못 돈 실행을 따라잡지 않지만, 깨어난 직후 몇 시간치 `gold_intraday` 가 몰릴 수 있다. 4 GiB 에 가까워지면 scheduler 를 멈춘다(`docker compose stop airflow-scheduler`, 안 멈추면 `docker ps` 로 이름을 보고 `docker kill`). `silver_reconcile_daily`(04:30)의 `silver_verify` 는 긴 정지 뒤 1800초 제한을 넘길 수 있다(D-258).
+추가로 긴 정지 뒤에는: `up-airflow` 직후 scheduler 메모리(`scripts/stack.sh stats`)를 본다. Airflow 는 `catchup=False` 라 못 돈 실행을 따라잡지 않지만, 깨어난 직후 몇 시간치 `gold_intraday` 가 몰릴 수 있다. 4 GiB 에 가까워지면 scheduler 를 멈춘다(`docker compose stop airflow-scheduler`, 안 멈추면 `docker ps` 로 이름을 보고 `docker kill`). `silver_reconcile_daily`(04:30)의 `silver_verify` 는 최근 1일 구간만 비교하므로 정지 길이와는 무관하다(D-258). 다만 구간을 잘라도 30분을 넘기면 시간 초과이니 Mac 실측 결과를 D-258 에서 확인한다.
 

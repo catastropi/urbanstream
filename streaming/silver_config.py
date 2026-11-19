@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -55,6 +56,27 @@ class SilverConfig:
             max_files_per_trigger=int(mf) if mf else None,
             long_term_days=float(y["long_term_days"]),
         )
+
+
+def verify_since(env: Optional[dict] = None, now: Optional[datetime] = None) -> Optional[datetime]:
+    """silver_verify 가 비교할 시작 시각(UTC, naive). 둘 다 없으면 None = 전체 이력.
+
+    SILVER_VERIFY_LOOKBACK_DAYS: 지금부터 N일 전.  SILVER_VERIFY_SINCE: 'YYYY-MM-DD'(한국 시간 0시).
+    둘 다 있으면 더 늦은 쪽을 쓴다. 전체 이력을 읽으면 파일이 늘수록 오래 걸리고(2026-11-19 실측 75분),
+    Bronze `_spark_metadata` 를 옮겨 복구한 표(D-255)는 복구 전 구간이 Bronze 쪽에서 보이지 않아 '초과'로 오탐한다.
+    """
+    e = os.environ if env is None else env
+    cands: list[datetime] = []
+    since = (e.get("SILVER_VERIFY_SINCE") or "").strip()
+    if since:
+        cands.append(datetime.strptime(since, "%Y-%m-%d") - timedelta(hours=9))
+    days = (e.get("SILVER_VERIFY_LOOKBACK_DAYS") or "").strip()
+    if days:
+        n = float(days)
+        if n <= 0:
+            raise ValueError("SILVER_VERIFY_LOOKBACK_DAYS 는 0보다 커야 합니다")
+        cands.append((now or datetime.utcnow()) - timedelta(days=n))
+    return max(cands) if cands else None
 
 
 def load_silver_tables(config_dir: str | Path) -> list[SilverTable]:
