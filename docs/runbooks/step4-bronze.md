@@ -44,7 +44,7 @@ scripts/stack.sh up-streaming
 ## 2. 도는지 확인
 
 ```zsh
-docker compose --profile streaming logs --tail=40 spark-bronze
+docker compose --profile core --profile streaming logs --tail=40 spark-bronze
 ```
 
 기대: `Bronze 시작: bootstrap=kafka:19092 starting=earliest trigger=60s ...` 와 토픽 7개 줄(`계약 스키마로 파싱` 5개, `원문만 보존` 2개). `ERROR`·`Exception` 이 없어야 합니다.
@@ -71,7 +71,7 @@ ls data/bronze/bus_position
 chmod -R a+rwX data/bronze data/checkpoints
 ```
 
-그다음 `docker compose --profile streaming restart spark-bronze`.
+그다음 `docker compose --profile core --profile streaming restart spark-bronze`.
 
 ## 3. 메모리 실측 (ADR-0005 결정 3 의 추정을 확정)
 
@@ -138,7 +138,7 @@ scripts/bronze_verify.sh
 Spark 만 끄고 core 는 유지:
 
 ```zsh
-docker compose --profile streaming stop spark-bronze
+docker compose --profile core --profile streaming stop spark-bronze
 ```
 
 전체 중지(데이터 유지)는 `scripts/stack.sh down`. 설정 되돌리기는 `.env` 의 `BRONZE_*`, `SPARK_*` 항목을 지우면 기본값이 됩니다 (`.env.example` 참고). 쓰기 주기를 늘려 파일 수를 줄이려면:
@@ -154,7 +154,7 @@ echo 'BRONZE_TRIGGER_SEC=300' >> .env
 Kafka offset 은 0 부터 다시 시작합니다. 그대로 두면 (a) 체크포인트의 offset 이 새 Kafka 보다 커서 쿼리가 `failOnDataLoss` 로 실패하거나 (b) 예전 Bronze 와 offset 이 겹쳐 `bronze_verify` 가 중복으로 판정합니다. **Kafka 를 지웠다면 Bronze 도 같이 치워야 합니다.** 지우기 전에 옮겨 두는 쪽을 권합니다 (원본 데이터는 `data/raw` 에 따로 있습니다).
 
 ```zsh
-docker compose --profile streaming stop spark-bronze
+docker compose --profile core --profile streaming stop spark-bronze
 ```
 
 ```zsh
@@ -180,13 +180,13 @@ python scripts/bronze_recover.py status
 `지워진 구간` 이 나온 표가 고칠 대상이다. 잃은 메시지 수도 같이 나온다. 로그로 확인하려면:
 
 ```zsh
-docker compose --profile streaming logs --tail 400 spark-bronze | grep -i -E "OffsetOutOfRange|may have been lost"
+docker compose --profile core --profile streaming logs --tail 400 spark-bronze | grep -i -E "OffsetOutOfRange|may have been lost"
 ```
 
 **복구.** 체크포인트의 시작 위치만 'Kafka 에 남아 있는 가장 이른 offset' 으로 올린다. batch 번호와 `data/bronze/<표>/_spark_metadata` 는 그대로 두므로 이전 Bronze 파일이 계속 읽히고, 새 batch 도 건너뛰어지지 않는다. 바꾸기 전 파일은 `data/_recovery/<시각>/` 에 남는다.
 
 ```zsh
-docker compose --profile streaming stop spark-bronze
+docker compose --profile core --profile streaming stop spark-bronze
 ```
 
 ```zsh
@@ -226,4 +226,4 @@ ls data/bronze/bus_arrival | tail -3
 
 - 이 Step 의 이미지 빌드, 실제 Kafka 연동, 배치 도중 kill 복구, 메모리는 **사용자 Mac 에서의 첫 실행이 검증**입니다 (ADR-0005 "검증 상태").
 - Bronze 는 Kafka 가 만들어진 시점부터입니다. 그 이전 구간(`data/raw` 에만 있는 15:06~Kafka 재생성 전)은 `replay_raw.py` 를 만들 때 채웁니다 (아직 없음).
-- `docker compose --profile streaming logs` 에는 Spark 의 `WARN` 이 일부 나옵니다 (`setLogLevel("WARN")`). `ERROR` 만 문제입니다.
+- `docker compose --profile core --profile streaming logs` 에는 Spark 의 `WARN` 이 일부 나옵니다 (`setLogLevel("WARN")`). `ERROR` 만 문제입니다.

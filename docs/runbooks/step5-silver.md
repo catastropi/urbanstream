@@ -10,7 +10,7 @@
 **1) 이미지 다시 만들기.** 코드가 이미지에 구워져 있어서 필요합니다. 돌고 있는 `spark-bronze` 는 재시작되지 않습니다.
 
 ```zsh
-docker compose --profile streaming build spark-bronze
+docker compose --profile core --profile streaming build spark-bronze
 ```
 
 기대: 대부분 `CACHED` 이고 `COPY streaming` 단계만 새로 만들어져 수십 초 안에 끝납니다 (커넥터 jar 단계는 캐시, 529초가 다시 걸리지 않음 — 추정. 오래 걸리면 알려 주세요).
@@ -61,7 +61,7 @@ scripts/silver_profile.sh 2>&1 | grep -v -E "INFO|WARN|^\s+at |Suppressed"
 ### 켜기
 
 ```zsh
-docker compose --profile streaming build spark-bronze
+docker compose --profile core --profile streaming build spark-bronze
 ```
 
 Silver 는 Bronze 와 **같은 이미지**를 쓴다(코드가 이미지에 들어 있음). 코드를 바꿨으면 이 빌드를 먼저 한다. 돌고 있는 Bronze 는 재시작되지 않는다.

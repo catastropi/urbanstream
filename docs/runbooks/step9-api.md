@@ -151,7 +151,7 @@ GOLD_TEST_DSN="host=127.0.0.1 port=5433 dbname=ut_test user=urbanstream password
 - DB 비밀번호 교체: `.env` 의 `API_DB_PASSWORD` 를 바꾸고 `scripts/stack.sh up-api` (역할 비밀번호를 다시 설정하고 컨테이너를 새 값으로 재기동).
 
 ## 되돌리기 / 끄기
-- API 만 끄기: `docker compose --profile api stop api`. 데이터·다른 서비스에는 영향이 없습니다.
+- API 만 끄기: `docker compose --profile core --profile api stop api`. 데이터·다른 서비스에는 영향이 없습니다.
 - 문서 화면만 끄기: `.env` 에 `API_DOCS_ENABLED=false`.
 - 캐시 끄기(문제 분리용): `.env` 에 `API_CACHE_TTL_SCALE=0`.
 - 로그인 역할 제거(013 취소): psql 에서 `DROP ROLE api_service;` — 013 파일 자체는 수정하지 않습니다(이미 적용된 마이그레이션은 체크섬이 고정).

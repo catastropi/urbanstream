@@ -16,7 +16,7 @@ CORE = ("postgres", "kafka")
 def test_expected_services_and_profiles():
     assert set(SERVICES) == {"postgres", "kafka", "kafka-ui", "spark-bronze", "spark-silver", "spark-gold",
                              "airflow-scheduler", "airflow-apiserver", "airflow-dag-processor", "gold-runner", "monitor", "api", "dashboard",
-                             "collector"}
+                             "collector", "measure"}
     assert SERVICES["postgres"]["profiles"] == ["core"] and SERVICES["kafka"]["profiles"] == ["core"]
     assert SERVICES["kafka-ui"]["profiles"] == ["dev"]
     assert SERVICES["spark-bronze"]["profiles"] == ["streaming"]    # core 만 켜면 Spark 는 뜨지 않는다 (메모리)
@@ -435,7 +435,8 @@ def test_gold_runner_gets_no_secrets_and_writes_only_gold_stage_and_silver_rebui
     for v in RUNNER["volumes"]:
         src, dst, *mode = v.split(":")
         if not mode or mode[0] != "ro":
-            assert dst in ("/data/gold_stage", "/data/silver_rebuild"), f"gold-runner 가 쓸 수 있는 곳은 스테이징·재처리 폴더뿐이다: {v}"
+            assert dst in ("/data/gold_stage", "/data/silver_rebuild", "/data/measure"), \
+                f"gold-runner 가 쓸 수 있는 곳은 스테이징·재처리·측정 폴더뿐이다: {v}"
     assert "./data/silver:/data/silver:ro" in RUNNER["volumes"], "스트리밍 Silver 는 재처리 중에도 읽기 전용 (ADR-0015)"
     assert RUNNER["environment"]["GOLD_SILVER_REBUILD_ROOT"] == "/data/silver_rebuild"
     srcs = {v.split(":")[0] for v in RUNNER["volumes"]}
@@ -505,3 +506,72 @@ def test_every_gold_stage_runner_can_see_the_rebuild_pointer():
     """read_silver 는 포인터 폴더가 없으면 스트리밍 Silver 만 읽는다 → Gold 를 만드는 모든 곳이 같은 폴더를 마운트해야 한다."""
     for name in ("gold-runner", "spark-gold", "airflow-scheduler"):
         assert any(v.split(":")[1] == "/data/silver_rebuild" for v in SERVICES[name]["volumes"]), name
+
+
+# ------------------------------------------------------------------ STEP 2: 측정
+MEASURE = SERVICES["measure"]
+
+
+def test_measure_service_is_opt_in_one_shot_and_bounded():
+    assert MEASURE["profiles"] == ["measure"], "측정 컨테이너는 스택을 켤 때 뜨지 않는다"
+    assert "ports" not in MEASURE and "healthcheck" not in MEASURE and "env_file" not in MEASURE
+    assert MEASURE["image"] == SERVICES["airflow-scheduler"]["image"] and "build" not in MEASURE
+    assert _default(MEASURE["mem_limit"]) == "1g" and _default(str(MEASURE["cpus"])) == "1"
+    assert MEASURE["entrypoint"][:2] == ["nice", "-n"]
+
+
+def test_measure_service_only_reaches_the_measure_db_and_folder():
+    env = MEASURE["environment"]
+    assert env["POSTGRES_DB"] == "urbanstream_measure", "측정 DB 이름을 고정한다 (.env 의 POSTGRES_DB 를 받지 않는다)"
+    assert env["GOLD_WRITER_USER"] == "gold_loader" and "POSTGRES_PASSWORD" not in env and "POSTGRES_USER" not in env
+    assert not any(k in env for k in ("SEOUL_API_KEY", "DATA_GO_KR_KEY", "API_KEYS", "ALERT_WEBHOOK_URL", "AIRFLOW__CORE__FERNET_KEY"))
+    for v in MEASURE["volumes"]:
+        src, dst, *mode = v.split(":")
+        if not mode or mode[0] != "ro":
+            assert src == "./data/measure", f"measure 가 쓸 수 있는 곳은 data/measure 뿐이다: {v}"
+        assert src not in ("./data/bronze", "./data/silver", "./data/gold_stage", "./data/silver_rebuild"), "운영 데이터는 마운트하지 않는다"
+    assert "docker.sock" not in str(MEASURE)
+
+
+def test_gold_runner_measure_root_matches_its_mount():
+    assert "./data/measure:/data/measure" in RUNNER["volumes"]
+    assert RUNNER["environment"]["GOLD_MEASURE_ROOT"] == "/data/measure"
+
+
+def test_services_running_our_code_as_pid1_have_an_init():
+    """좀비 프로세스가 남아 docker stop 이 실패하지 않도록 (11-25). Airflow 는 dumb-init, postgres·kafka 는 공식 이미지."""
+    for name in ("spark-bronze", "spark-silver", "spark-gold", "gold-runner", "measure", "monitor", "collector", "api", "dashboard"):
+        assert SERVICES[name].get("init") is True, name
+    assert "dumb-init" in " ".join(SERVICES["airflow-scheduler"]["command"])
+
+
+
+def _profile_sets_in_docs_and_scripts() -> dict[str, set[str]]:
+    """문서·스크립트에 적힌 프로필 조합. COMPOSE_PROFILES="a,b" 와 docker compose --profile a --profile b 둘 다."""
+    import re
+    files = [*sorted((ROOT / "docs" / "runbooks").glob("*.md")), ROOT / "scripts" / "stack.sh", ROOT / "scripts" / "measure_run.py"]
+    out: dict[str, set[str]] = {}
+    for f in files:
+        text = f.read_text(encoding="utf-8")
+        for i, line in enumerate(text.splitlines(), 1):
+            for m in re.finditer(r'COMPOSE_PROFILES="([^"$]+)"', line):
+                out[f"{f.name}:{i}"] = set(m.group(1).split(","))
+            profs = re.findall(r'--profile[",\s]+"?([a-z*]+)', line)
+            if "docker" in line and profs and "*" not in profs:
+                out[f"{f.name}:{i}"] = set(profs)
+    return out
+
+
+def test_every_documented_profile_set_includes_the_services_it_depends_on():
+    """11-25: `COMPOSE_PROFILES="collector" docker compose up -d collector` 가 'no such service: kafka' 로 실패했다.
+    Compose 는 켜진 프로필의 서비스가 depends_on 하는 서비스도 켜진 프로필에 있어야 정의를 받아들인다(--no-deps 여도)."""
+    sets = _profile_sets_in_docs_and_scripts()
+    assert any("measure" in s for s in sets.values()) and any("collector" in s for s in sets.values())
+    bad = []
+    for where, profiles in sets.items():
+        active = {n for n, s in SERVICES.items() if not s.get("profiles") or set(s["profiles"]) & profiles}
+        for n in active:
+            for dep in (SERVICES[n].get("depends_on") or {}):
+                if dep not in active:
+                    bad.append(f"{where}: {sorted(profiles)} 의 {n} → {dep}")
+    assert not bad, bad

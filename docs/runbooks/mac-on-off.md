@@ -9,30 +9,112 @@ Mac 에서 실행하는 순서. 비밀 값은 git·이슈·메신저 어디에�
 
 ## 1. 끌 때
 
+수집기가 컨테이너로 바뀐 뒤(11-22)의 기본 방법은 **`docker stop`** 이다. 컨테이너를 지우지 않고 멈추기만 하므로 켤 때 그대로 다시 시작할 수 있다.
+
 1. 수집기를 먼저 멈춘다. 먼저 멈추면 이미 들어간 데이터는 Bronze·Silver 로 정상 처리된다. 몇 분 기다리면 더 안전하지만 필수는 아니다(메시지는 Kafka 에 7일 남고 Spark 는 체크포인트에서 이어 받는다).
 
 ```zsh
-docker compose --profile collector stop collector
+docker stop urbanstream-collector
 ```
 
-(예전처럼 호스트에서 돌리고 있으면 그 터미널에서 Ctrl+C)
+2. 나머지 컨테이너를 모두 멈춘다(실행 중인 `urbanstream-*` 전부).
 
 ```zsh
-scripts/stack.sh down
+docker stop $(docker ps -q --filter name=urbanstream-)
 ```
 
-2. 데이터 볼륨(Postgres·Kafka)은 유지된다. **`scripts/stack.sh reset` 은 데이터를 지우니 쓰지 않는다.**
-3. 그다음 Docker Desktop 을 종료하거나 Mac 을 재워도 된다.
+3. 멈췄는지 확인한다. 아무것도 안 나오면 된다.
+
+```zsh
+docker ps --filter name=urbanstream-
+```
+
+4. 측정 표본 수집기(`docs/runbooks/measure.md` 2절)는 그대로 둬도 된다. Docker 가 꺼져 있으면 그 회차는 `"docker": false` 로 기록될 뿐 오류는 아니다(측정 보고서는 이 구간을 빈 구간으로 센다). Mac 을 끄거나 재시작하면 수집기도 끝난다.
+5. 그다음 Docker Desktop 을 종료하거나 Mac 을 재워도 된다.
+
+- 데이터 볼륨(Postgres·Kafka)은 유지된다. **`scripts/stack.sh reset` 은 데이터를 지우니 쓰지 않는다.**
+- `scripts/stack.sh down` 도 쓸 수 있지만 컨테이너를 **지운다**. 켤 때 2-B(`up-*`)로 다시 만들어야 하고, 지운 컨테이너의 재시작 횟수·OOM 기록도 사라진다. 평소에는 `docker stop` 을 쓴다.
+
+### 1-A. `docker stop` 이 "is zombie and can not be killed" 로 실패할 때
+
+컨테이너 안에 끝났는데 거둬지지 않은 프로세스(좀비)가 남은 경우다(11-25 수집기에서 한 번). 이미 Kafka 에 들어간 데이터는 안전하다.
+
+1. 강제로 끈다.
+
+```zsh
+docker kill urbanstream-collector
+```
+
+2. 같은 오류가 나면 Docker Desktop 을 통째로 끈다(고래 메뉴 > Quit Docker Desktop, 또는 아래 명령). 다른 컨테이너도 함께 멈춘다. 1분이 지나도 안 꺼지면 `pkill -x Docker; pkill -f com.docker.backend`.
+
+```zsh
+osascript -e 'quit app "Docker"'
+```
+
+3. 끄려던 참이면 여기서 끝이다. 다시 켤 때는 2절(Docker Desktop 먼저) 그대로 하고, 수집기는 다시 만들어 올린다.
+
+```zsh
+COMPOSE_PROFILES="core,collector" docker compose up -d collector
+```
+
+- 11-25 이후 `docker-compose.yml` 은 우리 코드가 도는 서비스에 `init: true` 를 둔다. 그 init 이 좀비를 거둬서 같은 일을 막는다. 다만 **컨테이너를 다시 만들어야 적용된다**(`docker compose start` 로는 안 바뀐다). 아직 다시 만들지 않은 컨테이너는 위 방법으로 끈다.
+- 다른 컨테이너에서 같은 오류가 나도 순서는 같다. 이름만 바꾼다.
 
 ## 2. 켤 때 (프로젝트 폴더, conda `urbanstream` 환경)
 
-1. Docker Desktop 시작 후 고래 아이콘이 "running" 이 될 때까지 기다린다(약 1분).
+1. **Docker Desktop 을 먼저 띄운다.** 고래 아이콘이 "running" 이 될 때까지 기다린다(약 1분). 이것이 안 되면 아래 명령이 전부 실패한다.
 
 ```zsh
 open -a Docker
 ```
 
-2. 스택을 순서대로 올린다. `down` 이 전부 내렸으므로 각각 다시 올려야 한다. 이미지는 만들어져 있어 빌드는 짧다 [추정]. Airflow 메모리 한도(`.env` 의 `AIRFLOW_*_MEM_LIMIT`)는 유지된다.
+확인(서버 버전이 나오면 준비된 것):
+
+```zsh
+docker version --format '{{.Server.Version}}'
+```
+
+2~3분이 지나도 "starting" 에서 멈춰 있으면 Docker 를 강제로 끄고 다시 띄운다(컨테이너·볼륨은 남는다).
+
+```zsh
+pkill -x Docker; pkill -f com.docker.backend
+```
+
+```zsh
+open -a Docker
+```
+
+### 2-A. 기본: 멈춰 둔 컨테이너를 다시 시작 (1번처럼 `docker stop` 으로 껐을 때)
+
+1. 수집기를 뺀 나머지를 시작한다. Compose 가 의존 순서(Postgres·Kafka 먼저)대로 켠다.
+
+```zsh
+COMPOSE_PROFILES="core,streaming,silver,airflow,monitor,api,dashboard" docker compose start
+```
+
+2. 상태 확인. 전부 `running (healthy)` 이면 정상이다(켠 직후 1~2분은 `starting` 일 수 있다).
+
+```zsh
+scripts/stack.sh ps
+```
+
+```zsh
+scripts/stack.sh check
+```
+
+3. **마지막에** 수집기를 시작한다(Kafka 가 먼저 떠 있어야 한다).
+
+```zsh
+COMPOSE_PROFILES="core,collector" docker compose start collector
+```
+
+`init: true`(1-A)는 이 방법으로는 들어가지 않는다. 컨테이너를 한 번 2-B 로 다시 만들어야 한다.
+
+`docker compose start` 가 "no container found" 로 끝나면 컨테이너가 지워진 것이다(`stack.sh down` 으로 껐거나 Docker 를 초기화함). 그때는 2-B 로 한다.
+
+### 2-B. 컨테이너가 지워졌을 때: `scripts/stack.sh up-*` 로 다시 만들기
+
+`down` 이 전부 내렸으면 각각 다시 올린다. 이미지는 만들어져 있어 빌드는 짧다 [추정]. Airflow 메모리 한도(`.env` 의 `AIRFLOW_*_MEM_LIMIT`)는 유지된다. 코드나 `docker-compose.yml` 을 바꾼 뒤(적용 ZIP 등)에도 이 방법으로 다시 만들어야 바뀐 설정이 들어간다.
 
 ```zsh
 scripts/stack.sh up-silver
@@ -44,6 +126,8 @@ scripts/stack.sh up-silver
 scripts/stack.sh up-airflow
 ```
 
+(Airflow 3개 + gold-runner)
+
 ```zsh
 scripts/stack.sh up-monitor
 ```
@@ -54,8 +138,6 @@ scripts/stack.sh up-dashboard
 
 (API 와 대시보드)
 
-3. 상태 확인. 전부 `running (healthy)` 이면 정상이다.
-
 ```zsh
 scripts/stack.sh ps
 ```
@@ -64,11 +146,13 @@ scripts/stack.sh ps
 scripts/stack.sh check
 ```
 
-4. **마지막에** 수집기를 시작한다(Kafka 가 먼저 떠 있어야 한다). 컨테이너로 돈다. 호스트에서 수집기가 돌고 있으면 시작을 거부한다(예산 파일을 같이 쓰기 때문).
+**마지막에** 수집기. 호스트에서 수집기가 돌고 있으면 시작을 거부한다(예산 파일을 같이 쓰기 때문).
 
 ```zsh
 scripts/stack.sh up-collector
 ```
+
+### 2-C. 수집기 확인 (2-A·2-B 공통)
 
 로그와 호출 예산 확인(예산은 호스트에서 돌던 때와 같은 `data/collector/budget.json` 을 이어 쓴다):
 
@@ -82,12 +166,24 @@ python -m collector status
 
 컨테이너가 안 될 때의 예전 방법: `caffeinate -i python -m collector run` (컨테이너를 먼저 멈춘다).
 
+### 2-D. 측정 표본 수집기 (STEP 2 동안)
+
+Mac 을 재시작했거나 로그아웃했으면 다시 켠다(이미 돌고 있으면 그렇다고 알려 주고 끝난다).
+
+```zsh
+python scripts/measure_sample.py --start
+```
+
+```zsh
+python scripts/measure_sample.py --status
+```
+
 ## 3. 켠 뒤 알아둘 것
 - **Airflow 는 꺼진 동안 못 돈 실행을 따라잡지 않는다.** 모든 DAG 가 `catchup=False` — 꺼져 있던 시간대의 Gold·마트는 비어 있다. 필요하면 `backfill` DAG 로 수동 보충(HANDOFF 7장).
 - **켠 직후 몇 분은 Discord 에 적재 정체·소스 down 알림이 올 수 있다.** 보통 곧 "해소" 가 따라온다. 20~30분 지나도 해소가 안 오면 `scripts/stack.sh logs spark-bronze` 등으로 본다.
 - DAG 일시정지 상태는 Airflow DB(볼륨)에 남는다 [추정]. Airflow UI(http://127.0.0.1:8080)에서 DAG 가 켜져 있는지 한 번 본다.
-- **Docker Desktop·Mac 재시작 후 컨테이너는 자동으로 켜지지 않는다**(재시작 정책이 `on-failure`, D-214). 위 2번을 다시 한다.
-- 컨테이너가 죽어 있으면 **재생성하기 전에** `docker inspect -f '{{.Name}} 재시작횟수={{.RestartCount}} OOM={{.State.OOMKilled}} 종료={{.State.FinishedAt}}' <컨테이너>` 로 먼저 기록한다(`up-*` 가 컨테이너를 다시 만들면 정보가 사라진다).
+- **Docker Desktop·Mac 재시작 후 컨테이너는 자동으로 켜지지 않는다**(재시작 정책이 `on-failure`, D-214). 위 2번(보통 2-A)을 다시 한다.
+- 컨테이너가 죽어 있으면 **재생성하기 전에** `docker inspect -f '{{.Name}} 재시작횟수={{.RestartCount}} OOM={{.State.OOMKilled}} 종료={{.State.FinishedAt}}' <컨테이너>` 로 먼저 기록한다(`up-*`·`down` 이 컨테이너를 다시 만들거나 지우면 정보가 사라진다).
 - 하루 중 수집이 비어 있는지는 `ls data/bronze/bus_position` 의 `event_date=...` 폴더 파일 수로 본다(비어 있는 날 = Mac 이 잠든 날).
 
 ## 4. 덮개를 닫은 채 돌려야 할 때 (부득이한 경우만)

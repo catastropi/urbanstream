@@ -90,7 +90,7 @@ docker exec urbanstream-airflow-scheduler airflow dags trigger backfill --conf '
 | `AIRFLOW_FERNET_KEY 가 .env 에 없습니다` | init-env 안 함 | 1번 실행 |
 | `gold_writer 역할이 없습니다` | 마이그레이션 전 | `python scripts/migrate.py` |
 | 빌드에서 `apt-get` 실패 | 베이스 이미지가 Debian 계열이 아님(D-91) | 로그를 알려 주세요. Dockerfile 수정 |
-| 스케줄러가 healthy 가 안 됨 | 마이그레이션이 오래 걸림 / Compose 구버전(D-92) | `docker compose --profile airflow logs airflow-scheduler` |
+| 스케줄러가 healthy 가 안 됨 | 마이그레이션이 오래 걸림 / Compose 구버전(D-92) | `docker compose --profile core --profile airflow logs airflow-scheduler` |
 | `Permission denied` (logs, gold_stage) | bind mount 소유자(uid 50000) | `chmod -R a+rwX data/airflow data/gold_stage` 후 재시작 |
 | 태스크가 `OOM`/종료 코드 137 | 스케줄러 한도 부족 | `.env` 에 `AIRFLOW_SCHEDULER_MEM_LIMIT=4g` 추가 후 `up-airflow` |
 | 실행이 `queued` 에서 안 움직임 | 풀 `gold_io` 슬롯이 사용 중(다른 실행이 도는 중) | 정상. 앞 실행이 끝나길 기다림 |

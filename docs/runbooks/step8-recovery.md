@@ -38,7 +38,7 @@ docker exec urbanstream-airflow-scheduler airflow dags unpause anomaly_scan
 ```
 
 ## 3. 수집기 재시작 (잠자기 감지 반영, D-81)
-`docker compose --profile collector restart collector` (호스트에서 돌리면 Ctrl+C 후 다시 `python -m collector run`). 재시작하지 않으면 `host_resume` 을 내지 않아 잠자기 격하가 작동하지 않고 DAG 실패는 원래 수준(error)으로 옵니다(안전한 쪽).
+`docker compose --profile core --profile collector restart collector` (호스트에서 돌리면 Ctrl+C 후 다시 `python -m collector run`). 재시작하지 않으면 `host_resume` 을 내지 않아 잠자기 격하가 작동하지 않고 DAG 실패는 원래 수준(error)으로 옵니다(안전한 쪽).
 
 ## 4. 웹훅 점검
 ```zsh

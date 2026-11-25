@@ -21,7 +21,7 @@ pip install -r requirements.txt
 ```
 
 ```zsh
-docker compose --profile streaming build spark-bronze
+docker compose --profile core --profile streaming build spark-bronze
 ```
 
 `batch/` 코드가 이미지에 들어가므로 빌드가 필요합니다(D-56). 돌고 있는 Bronze/Silver 는 재시작되지 않습니다.

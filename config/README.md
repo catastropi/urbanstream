@@ -5,5 +5,6 @@
 - sources.yaml — 소스별 폴링 간격, 호출 예산, 엔드포인트
 - dq_rules.yaml — Data Quality 규칙 정의
 - thresholds/ — 혼잡 단계 임계값 버전 (dim_congestion_level)
+- measure.yaml — STEP 2 성능 측정: 경로, 합성 데이터 날짜·규모, 실행 전 검사·실행 중 감시 기준, 금지 시간대, 반복 횟수, 판단 기준 (scripts/measure_*.py 가 읽는다)
 
 기존 ecommerce-pipeline의 config.yaml(+ .env 분리) 패턴을 계승한다.

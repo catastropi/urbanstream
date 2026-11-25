@@ -566,3 +566,142 @@ def test_rebuild_timeout_matches_airflow_wait_and_gold_stage_keeps_1800(tmp_path
     assert R.DEFAULT_TIMEOUT_SEC < _killed_after(tmp_path / "b", (gs, "1__a__r__try1"), {}) <= R.DEFAULT_TIMEOUT_SEC + 120
     rb2 = put_kind(tmp_path / "c", "1__rb__try1", "silver_rebuild", {"tables": ["silver_weather"], "version": "r0001t1"}, "rb__try1", 1.0)
     assert _killed_after(tmp_path / "c", (rb2, "1__rb__try1"), {"GOLD_RUNNER_REBUILD_TIMEOUT_SEC": "600"}) <= 720
+
+
+# ------------------------------------------------------------------ STEP 2: kind=measure
+
+def put_measure(base: Path, rid: str, args: dict, stage_dir: Path, created: float = 1.0) -> Path:
+    req = R.requests_dir(base)
+    req.mkdir(parents=True, exist_ok=True)
+    R.write_json_atomic(req / f"{rid}.json", {"id": rid, "key": f"measure__{rid}", "date_from": "2026-01-05", "date_to": "2026-01-05",
+                                              "stage_dir": str(stage_dir), "created_at": time.time() - 60 + created, "kind": "measure",
+                                              "args": args})
+    return req
+
+
+def _measure_env(tmp_path, **extra):
+    m = tmp_path / "measure"
+    m.mkdir(exist_ok=True)
+    return m, {"GOLD_MEASURE_ROOT": str(m), "GOLD_RUNNER_MEASURE_NICE": "0", **extra}
+
+
+def _build_args(m: Path, **over):
+    a = {"job": "silver_build", "tables": ["silver_weather"], "version": "m0", "bronze_root": str(m / "syn/bronze"),
+         "silver_root": str(m / "syn/_current"), "rebuild_root": str(m / "syn/rebuild"), "report": str(m / "syn/r.json")}
+    a.update(over)
+    return a
+
+
+def test_measure_build_uses_only_measure_paths_and_reports_memory(tmp_path, monkeypatch):
+    m, env = _measure_env(tmp_path)
+    cg = tmp_path / "memory.current"
+    cg.write_text("123456789")
+    monkeypatch.setattr(R, "CGROUP_MEM", cg)
+    calls = []
+
+    def run(cmd, env, stdout=None, stderr=None, **kw):
+        calls.append((cmd, env))
+        return Proc(0, "{}", polls=2, stdout=stdout, stderr=stderr)
+    put_measure(tmp_path, "measure-1", _build_args(m), m / "syn/reports")
+    assert R.process_pending(tmp_path, launcher=run, env=env, sleep=lambda s: None) == [("measure-1", "done")]
+    cmd, e = calls[0]
+    assert cmd[cmd.index("build") - 1].endswith("silver_rebuild.py") and cmd[cmd.index("--rebuild-root") + 1] == str(m / "syn/rebuild")
+    assert (e["SILVER_BRONZE_ROOT"], e["SILVER_ROOT"], e["SILVER_REBUILD_ROOT"]) == (str(m / "syn/bronze"), str(m / "syn/_current"),
+                                                                                      str(m / "syn/rebuild"))
+    done = json.loads((R.requests_dir(tmp_path) / "measure-1.done").read_text())
+    assert done["mem_max_bytes"] == 123456789 and done["mem_sample_sec"] == 2.0
+
+
+@pytest.mark.parametrize("over", [
+    {"rebuild_root": "/data/silver_rebuild"},                 # 운영 재처리 폴더에 쓰려 함
+    {"report": "/tmp/x.json"},
+    {"bronze_root": "/etc"},                                  # 읽기도 허용된 곳만
+    {"job": "rm_rf"},
+    {"tables": ["../../etc"]},
+])
+def test_measure_requests_outside_the_allowed_paths_are_refused(tmp_path, over):
+    m, env = _measure_env(tmp_path)
+
+    def no_spark(*a, **k):
+        raise AssertionError("거부된 요청은 Spark 를 띄우지 않는다")
+    put_measure(tmp_path, "measure-2", _build_args(m, **over), m / "syn/reports")
+    assert R.process_pending(tmp_path, launcher=no_spark, env=env) == [("measure-2", "failed")]
+    assert "측정 요청 거부" in (R.requests_dir(tmp_path) / "measure-2.failed").read_text()
+
+
+def test_measure_stage_dir_must_be_under_measure_root(tmp_path):
+    m, env = _measure_env(tmp_path)
+    put_measure(tmp_path, "measure-3", _build_args(m), tmp_path / "elsewhere")
+    assert R.process_pending(tmp_path, launcher=launcher(), env=env) == [("measure-3", "failed")]
+
+
+def test_measure_may_read_production_roots_read_only(tmp_path):
+    m, env = _measure_env(tmp_path)
+    put_measure(tmp_path, "measure-4", _build_args(m, bronze_root="/data/bronze", silver_root="/data/silver"), m / "c/w")
+    calls = []
+    assert R.process_pending(tmp_path, launcher=launcher(seen=calls), env=env) == [("measure-4", "done")]
+
+
+def test_measure_gold_stage_points_every_gold_root_at_measure_paths(tmp_path):
+    m, env = _measure_env(tmp_path, GOLD_SILVER_ROOT="/data/silver", GOLD_BRONZE_ROOT="/data/bronze")
+    calls = []
+
+    def run(cmd, env, stdout=None, stderr=None, **kw):
+        calls.append((cmd, env))
+        return Proc(0, "{}", stdout=stdout, stderr=stderr)
+    args = {"job": "gold_stage", "silver_root": str(m / "s/_current"), "silver_rebuild_root": str(m / "s/rebuild"),
+            "bronze_root": str(m / "s/bronze"), "stage_root": str(m / "s/gold_stage/r0")}
+    put_measure(tmp_path, "measure-5", args, m / "s/reports")
+    assert R.process_pending(tmp_path, launcher=run, env=env) == [("measure-5", "done")]
+    cmd, e = calls[0]
+    assert cmd[-4:] == ["--from", "2026-01-05", "--to", "2026-01-05"] and any(c.endswith("gold_stage.py") for c in cmd)
+    assert "--files-until" not in cmd
+    assert (e["GOLD_SILVER_ROOT"], e["GOLD_BRONZE_ROOT"], e["GOLD_SILVER_REBUILD_ROOT"], e["GOLD_STAGE_ROOT"]) == (
+        str(m / "s/_current"), str(m / "s/bronze"), str(m / "s/rebuild"), str(m / "s/gold_stage/r0"))
+
+
+def test_measure_verify_counts_a_failed_comparison_as_a_finished_measurement(tmp_path):
+    m, env = _measure_env(tmp_path, SILVER_VERIFY_LOOKBACK_DAYS="1")
+    calls = []
+
+    def run(cmd, env, stdout=None, stderr=None, **kw):
+        calls.append((cmd, env))
+        return Proc(1, "전체: 실패", stdout=stdout, stderr=stderr)
+    put_measure(tmp_path, "measure-6", {"job": "silver_verify", "bronze_root": str(m / "c/bronze"), "silver_root": str(m / "c/silver"),
+                                        "verify_since": "2026-11-27"}, m / "c/w")
+    assert R.process_pending(tmp_path, launcher=run, env=env) == [("measure-6", "done")]
+    cmd, e = calls[0]
+    assert cmd[-1].endswith("silver_verify.py")
+    assert e["SILVER_VERIFY_SINCE"] == "2026-11-27" and "SILVER_VERIFY_LOOKBACK_DAYS" not in e
+    assert e["SILVER_REBUILD_ROOT"].startswith(str(m)), "운영 포인터로 떨어지지 않는다"
+
+
+def test_measure_point_publishes_only_inside_the_measure_folder(tmp_path):
+    from streaming import silver_pointer as P
+    m, env = _measure_env(tmp_path)
+    rb = m / "s/rebuild"
+    vd = P.version_dir(rb, "silver_weather", "m0")
+    (vd / "event_date=2026-01-05").mkdir(parents=True)
+    P.write_json_atomic(vd / P.BUILD_FILE, {"status": "ok", "partition_col": "event_date", "dates": {"2026-01-05": 4}})
+
+    def no_spark(*a, **k):
+        raise AssertionError("silver_point 는 Spark 를 띄우지 않는다")
+    put_measure(tmp_path, "measure-7", {"job": "silver_point", "tables": ["silver_weather"], "version": "m0", "rebuild_root": str(rb)},
+                m / "s/reports")
+    assert R.process_pending(tmp_path, launcher=no_spark, env=env) == [("measure-7", "done")]
+    assert P.active_dates(rb, "silver_weather") == {"2026-01-05": "m0"}
+
+
+def test_measure_runs_niced_with_its_own_timeout(tmp_path):
+    m, env = _measure_env(tmp_path)
+    env.pop("GOLD_RUNNER_MEASURE_NICE")
+    calls = []
+    put_measure(tmp_path, "measure-8", _build_args(m), m / "syn/reports")
+    R.process_pending(tmp_path, launcher=launcher(seen=calls), env=env)
+    assert calls[0][0][:3] == ["nice", "-n", "10"]
+    killed = []
+    put_measure(tmp_path, "measure-9", _build_args(m, version="m1"), m / "syn/reports", created=2.0)
+    t = iter(range(0, 10_000, 100))
+    R.process_pending(tmp_path, launcher=launcher(polls=10_000), env={**env, "GOLD_RUNNER_MEASURE_TIMEOUT_SEC": "250"},
+                      clock=lambda: next(t), sleep=lambda s: None, kill=killed.append)
+    assert killed and "250초" in (R.requests_dir(tmp_path) / "measure-9.failed").read_text()

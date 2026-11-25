@@ -1,5 +1,8 @@
 # Step 11 (ADR-0013 D11-4): CI 게이트는 '치명 오류'만 본다 — 문법 오류(E9), 잘못된 비교/== 형식(F63), 문장 오류(F7), 정의되지 않은 이름(F82).
 # F401(안 쓰는 import)·F811(재정의)은 pytest fixture import 패턴(`from pg_support import pg`) 때문에 오탐 129건이라 켜지 않는다.
 # 포매터는 도입하지 않는다(전 파일 재포맷 diff 가 커서 되돌리기 어렵다).
+# 대상 버전 3.11: Mac 의 conda 환경과 주간 CI 행렬의 가장 낮은 버전. 3.12 에서만 되는 문법(f-string 안 같은 따옴표 등)을 여기서 잡는다.
+target-version = "py311"
+
 [lint]
 select = ["E9", "F63", "F7", "F82"]

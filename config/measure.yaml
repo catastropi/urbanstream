@@ -1,0 +1,83 @@
+# STEP 2 성능 측정 설정. 도구: scripts/measure_*.py, scripts/synth_bronze.py. 사용법: docs/runbooks/measure.md
+# 숫자를 바꾸면 측정 결과 비교가 깨질 수 있다. 바꾼 날짜와 이유를 docs/performance.md 의 환경 절에 적는다.
+version: 1
+
+# 장기 연속 수집 시작일(KST). 수동 지표(M1~M4)의 집계 시작이고, 무거운 측정(M5~M7)은 이 날로부터 heavy_after_days 뒤에 한다.
+# 11-24 밤~11-25 낮에 Docker 가 꺼져 수집이 끊겼으므로 11-25 로 다시 잡았다.
+collection_start: "2026-11-25"
+heavy_after_days: 14
+
+paths:
+  measure_root: data/measure            # 측정 도구가 쓰는 유일한 곳 (git 제외). 합성·사본·원시 표본·결과
+  samples: data/measure/samples         # 5분 표본(JSONL, 날짜별)
+  env: data/measure/env                 # 환경 기록 JSON
+  results: data/measure/results         # 능동 측정 원시 기록(JSONL)
+  profile: data/measure/profile         # 실제 하루 프로파일(합성 입력)
+  synthetic: data/measure/synthetic     # 합성 Bronze·Silver·스테이징 (<run_id>/)
+  copy: data/measure/copy               # M7 병합 사본 (<run_id>/)
+  lock: data/measure/.lock
+  report_dir: docs/performance          # 요약 CSV·환경 JSON (저장소에 커밋, 결정 9)
+  # 운영 경로. 측정 도구는 여기에 쓰지 않는다(읽기만). 출력 경로가 이 아래면 시작하지 않는다
+  protected: [data/bronze, data/silver, data/silver_rebuild, data/gold_stage, data/checkpoints, data/raw, data/collector]
+
+# 합성 데이터 (설계안 3장)
+synthetic:
+  first_date: "2026-01-05"              # 합성 날짜는 이 날부터. 실제 데이터(2026-11-03~)와 겹치지 않는다
+  real_data_start: "2026-11-03"         # 이 날 이후의 날짜로는 합성을 만들지 않는다
+  scales: [1, 5, 10]
+  disk_cap_gib: 8                       # data/measure/synthetic + copy 합계 상한 (결정 5)
+  profile_date: "2026-11-04"            # 기본 프로파일 날짜(하루가 온전히 채워진 날 중 행이 가장 많은 날)
+  measure_db: urbanstream_measure       # 합성 Gold 를 넣는 별도 DB. 끝나면 DROP (결정 3)
+
+# 실행 전 검사 (설계안 6-2). 하나라도 걸리면 시작하지 않는다
+gate:
+  expected_containers: [postgres, kafka, spark-bronze, spark-silver, gold-runner, airflow-scheduler,
+                        airflow-apiserver, airflow-dag-processor, monitor, collector, api, dashboard]
+  min_free_mem_gib: 2.5                 # Docker VM 메모리 - 컨테이너 실제 사용 합
+  max_cpu_pct_1m: 200                   # 직전 1분 컨테이너 CPU 합 평균 (%. 4 vCPU = 400%)
+  cpu_samples: 4                        # 1분 동안 몇 번 떠서 평균할지
+  min_disk_free_gib: 15
+  disk_output_factor: 3                 # 여유 디스크 >= 예상 출력 × 이 값
+  require_ac_power: true
+  require_caffeinate: true
+  data_gap_lookback_min: 30             # 최근 N분 ops.data_gap 에 새 공백이 있으면 시작하지 않는다
+
+# 실행 중 감시 (설계안 6-3). 하나라도 걸리면 그 회를 끊고 무효로 적는다
+watch:
+  interval_sec: 10
+  max_cpu_pct: 340
+  max_cpu_sustain_sec: 60
+  min_free_mem_gib: 1.0
+  restart_watch: [spark-bronze, spark-silver, kafka]
+  max_sample_gap_sec: 30                # 표본 사이가 이보다 길면 Mac 이 잠든 것으로 본다
+  settle_healthy_sec: 300               # 중단 뒤 모두 healthy 가 이만큼 이어져야 다음 측정 (6-6)
+
+# 측정 금지 시간대 (KST, 설계안 6-5). [시작, 끝) "HH:MM". 매시 반복은 hourly 에 "MM" 으로
+forbidden:
+  hourly: [["15", "40"]]                # gold_intraday :20, anomaly_scan :35
+  daily: [["00:45", "05:30"]]           # gold_daily 01:00 ~ dq_report_daily 05:00
+  max_run_sec: 1500                     # 한 회는 25분 안에 끝나는 크기로 나눈다
+
+# 반복과 통계 (설계안 5장)
+repeat:
+  short_sec: 300                        # 한 회가 이보다 짧으면 예열 1회 + short_n 회
+  short_n: 5
+  long_n: 3                             # 5~30분: 예열 없이 3회
+  slow_first_ratio: 1.2                 # 첫 회가 나머지 중앙값보다 이 배수 넘게 느리면 표시
+
+# 실행 위치와 상한 (설계안 6-4)
+runner:
+  measure_timeout_sec: 1200             # gold-runner kind=measure 한 요청 상한 (GOLD_RUNNER_MEASURE_TIMEOUT_SEC 와 같게)
+  measure_nice: 10
+
+# 개선 작업 조건 (설계안 2-3)
+decide:
+  m2_loader_peak_mib: 512               # 10× 로더 최대 메모리가 이 값을 넘으면 배치 COPY
+  m2_time_ratio_5_to_10: 2.5            # 5×→10× 적재 시간비가 이 값을 넘으면 배치 COPY
+  h5_min_read_cut: 0.30                 # 병합 사본이 읽기 시간을 이만큼 이상 줄이면 compaction 설계안
+
+# 5분 표본 (M1, M2)
+sample:
+  interval_sec: 300
+  checkpoint_root: data/checkpoints
+  layers: [bronze, silver]
