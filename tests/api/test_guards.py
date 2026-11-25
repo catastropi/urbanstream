@@ -18,8 +18,10 @@ ROOT = Path(__file__).resolve().parents[2]
 API_FILES = sorted((ROOT / "api").rglob("*.py"))
 WRITE_WORDS = re.compile(r"\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|GRANT|REVOKE|COPY|VACUUM|REFRESH|CALL)\b")
 
-# 뷰는 있으나 API 로 노출하지 않는 것 (이유를 적는다). 지금은 없음.
-EXCLUDED_VIEWS: dict[str, str] = {}
+# 뷰는 있으나 API 로 노출하지 않는 것 (이유를 적는다).
+EXCLUDED_VIEWS: dict[str, str] = {
+    "ops.v_reprocess_recent": "운영자용 재처리 이력(런북에서 psql 로 본다). 외부 API 로 내보낼 정보가 아니다",
+}
 
 
 def _module_consts(tree: ast.Module) -> dict[str, str]:

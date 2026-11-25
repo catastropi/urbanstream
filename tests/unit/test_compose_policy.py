@@ -15,7 +15,8 @@ CORE = ("postgres", "kafka")
 
 def test_expected_services_and_profiles():
     assert set(SERVICES) == {"postgres", "kafka", "kafka-ui", "spark-bronze", "spark-silver", "spark-gold",
-                             "airflow-scheduler", "airflow-apiserver", "airflow-dag-processor", "monitor", "api", "dashboard"}
+                             "airflow-scheduler", "airflow-apiserver", "airflow-dag-processor", "gold-runner", "monitor", "api", "dashboard",
+                             "collector"}
     assert SERVICES["postgres"]["profiles"] == ["core"] and SERVICES["kafka"]["profiles"] == ["core"]
     assert SERVICES["kafka-ui"]["profiles"] == ["dev"]
     assert SERVICES["spark-bronze"]["profiles"] == ["streaming"]    # core 만 켜면 Spark 는 뜨지 않는다 (메모리)
@@ -201,8 +202,9 @@ def test_gold_is_a_oneshot_profile_service_reusing_the_image_without_secrets_or_
 
 def test_gold_mounts_silver_and_bronze_read_only_and_writes_only_gold_stage():
     vols = {v.split(":")[0]: v for v in GOLD["volumes"]}
-    assert sorted(vols) == ["./data/bronze", "./data/gold_stage", "./data/silver"]
+    assert sorted(vols) == ["./data/bronze", "./data/gold_stage", "./data/silver", "./data/silver_rebuild"]
     assert vols["./data/bronze"].endswith(":ro") and vols["./data/silver"].endswith(":ro")
+    assert vols["./data/silver_rebuild"].endswith(":ro"), "STEP 1: 재처리 버전은 읽기만 한다 (게시는 gold-runner)"
     assert not vols["./data/gold_stage"].endswith(":ro")
     cmd = GOLD["command"]
     assert cmd[-1] == "/app/batch/gold_stage.py"
@@ -252,6 +254,7 @@ def test_airflow_data_mounts_are_read_only_except_stage_and_logs():
                 assert dst in ("/data/gold_stage", "/opt/airflow/logs"), f"{name}: {v} 는 읽기 전용이어야 합니다"
         assert any(v.startswith("./data/silver:/data/silver:ro") for v in svc["volumes"])
         assert any(v.startswith("./data/bronze:/data/bronze:ro") for v in svc["volumes"])
+        assert "./data/silver_rebuild:/data/silver_rebuild:ro" in svc["volumes"], "STEP 1: silver_verify·inline 스테이징이 재처리 버전을 봐야 한다"
 
 
 def test_airflow_scheduler_memory_covers_spark_heap_and_start_order():
@@ -412,3 +415,93 @@ def test_stack_sh_up_dashboard_checks_keys_before_starting_and_enables_all_neede
     assert block.index("DASHBOARD_API_KEY") < block.index("docker compose up")
     assert "--check-dashboard-key" in block and "db_bootstrap.py --api" in block and "--build" in block
     assert 'COMPOSE_PROFILES="core,api,dashboard"' in block
+
+
+# ------------------------------------------------------------------ STEP 3A: gold-runner
+RUNNER = SERVICES["gold-runner"]
+
+
+def test_gold_runner_reuses_the_spark_image_and_starts_with_airflow():
+    assert RUNNER["image"] == SPARK["image"] and "build" not in RUNNER, "Bronze/Silver 와 같은 이미지(같은 Spark·커넥터)"
+    assert RUNNER["profiles"] == ["airflow"], "Airflow 가 요청을 남기므로 같이 켜져야 한다"
+    assert RUNNER["command"][:3] == ["python3", "-m", "batch.stage_runner"]
+    assert "ports" not in RUNNER and "depends_on" not in RUNNER
+
+
+def test_gold_runner_gets_no_secrets_and_writes_only_gold_stage_and_silver_rebuild():
+    env_text = str(RUNNER.get("environment", {})).upper()
+    assert not any(w in env_text for w in ("KEY", "PASSWORD", "SECRET", "TOKEN", "POSTGRES")) and "env_file" not in RUNNER
+    assert "docker.sock" not in str(RUNNER)
+    for v in RUNNER["volumes"]:
+        src, dst, *mode = v.split(":")
+        if not mode or mode[0] != "ro":
+            assert dst in ("/data/gold_stage", "/data/silver_rebuild"), f"gold-runner 가 쓸 수 있는 곳은 스테이징·재처리 폴더뿐이다: {v}"
+    assert "./data/silver:/data/silver:ro" in RUNNER["volumes"], "스트리밍 Silver 는 재처리 중에도 읽기 전용 (ADR-0015)"
+    assert RUNNER["environment"]["GOLD_SILVER_REBUILD_ROOT"] == "/data/silver_rebuild"
+    srcs = {v.split(":")[0] for v in RUNNER["volumes"]}
+    assert {"./batch", "./src", "./streaming", "./config"} <= srcs, "Airflow 와 같은 코드를 써야 한다 (이미지 안 코드와 어긋나지 않게)"
+
+
+def test_gold_runner_memory_covers_its_spark_heap_and_airflow_defaults_to_runner():
+    heap = _mem_mib(RUNNER["environment"]["GOLD_DRIVER_MEMORY"])
+    assert _mem_mib(_default(RUNNER["mem_limit"])) >= heap * 1.4
+    assert SERVICES["airflow-scheduler"]["environment"]["GOLD_STAGE_MODE"] == "${GOLD_STAGE_MODE:-runner}"
+    assert "/data/gold_stage/_requests/.runner_alive" in str(RUNNER["healthcheck"])
+
+
+# ------------------------------------------------------------------ STEP 3A: collector
+COLLECTOR = SERVICES["collector"]
+
+
+def test_collector_is_opt_in_and_waits_for_kafka_without_ports():
+    assert COLLECTOR["profiles"] == ["collector"]
+    assert COLLECTOR["depends_on"]["kafka"]["condition"] == "service_healthy"
+    assert COLLECTOR["environment"]["KAFKA_BOOTSTRAP"] == "kafka:19092"
+    assert "ports" not in COLLECTOR
+
+
+def test_collector_gets_only_its_api_keys_by_name():
+    env = COLLECTOR["environment"]
+    assert env["SEOUL_API_KEY"] == "${SEOUL_API_KEY:-}" and env["DATA_GO_KR_KEY"] == "${DATA_GO_KR_KEY:-}"
+    assert "env_file" not in COLLECTOR and "docker.sock" not in str(COLLECTOR)
+    text = str(env)
+    for forbidden in ("POSTGRES", "GOLD_", "AIRFLOW", "ALERT_WEBHOOK", "API_KEYS", "API_DB_", "DASHBOARD"):
+        assert forbidden not in text, f"collector 환경에 {forbidden} 가 들어 있다"
+    compose_text = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    assert not re.search(r"(SEOUL_API_KEY|DATA_GO_KR_KEY):\s*[A-Za-z0-9]", compose_text)
+
+
+def test_collector_is_hardened_and_writes_only_raw_and_budget():
+    assert COLLECTOR["read_only"] is True and COLLECTOR["cap_drop"] == ["ALL"]
+    assert "no-new-privileges:true" in COLLECTOR["security_opt"]
+    vols = {v.split(":")[0]: v for v in COLLECTOR["volumes"]}
+    assert sorted(vols) == ["./config", "./data/collector", "./data/raw"]
+    assert vols["./config"].endswith(":ro")
+    # 호스트에서 돌던 때와 같은 경로(collector/__main__.py 의 ROOT/data/...)여야 예산을 이어 센다
+    assert vols["./data/collector"] == "./data/collector:/app/data/collector"
+    assert vols["./data/raw"] == "./data/raw:/app/data/raw"
+
+
+def test_collector_dockerfile_is_pinned_unprivileged_and_copies_no_secrets():
+    df = (ROOT / "docker/collector/Dockerfile").read_text(encoding="utf-8")
+    assert re.search(r"ARG PYTHON_IMAGE=python:3\.\d+-slim-bookworm", df)
+    assert re.search(r"^USER 10001$", df, re.M)
+    copies = re.findall(r"^COPY (.+)$", df, re.M)
+    assert copies == ["requirements-collector.txt ./", "src ./src", "collector ./collector", "config ./config"], copies
+    lines = [l.strip() for l in (ROOT / "requirements-collector.txt").read_text(encoding="utf-8").splitlines()
+             if l.strip() and not l.startswith("#")]
+    assert lines and all("==" in l for l in lines), lines
+    assert {l.split("==")[0] for l in lines} == {"confluent-kafka", "python-dotenv", "PyYAML", "requests"}
+
+
+# ------------------------------------------------------------------ STEP 1: 재처리 폴더
+def test_streaming_silver_never_sees_the_rebuild_folder():
+    """spark-silver 는 data/silver 와 체크포인트만 쓴다. 재처리 버전 폴더를 주면 sink 로그와 섞일 위험이 생긴다."""
+    assert not any("silver_rebuild" in v for v in SERVICES["spark-silver"]["volumes"])
+    assert not any("silver_rebuild" in v for v in SERVICES["spark-bronze"]["volumes"])
+
+
+def test_every_gold_stage_runner_can_see_the_rebuild_pointer():
+    """read_silver 는 포인터 폴더가 없으면 스트리밍 Silver 만 읽는다 → Gold 를 만드는 모든 곳이 같은 폴더를 마운트해야 한다."""
+    for name in ("gold-runner", "spark-gold", "airflow-scheduler"):
+        assert any(v.split(":")[1] == "/data/silver_rebuild" for v in SERVICES[name]["volumes"]), name

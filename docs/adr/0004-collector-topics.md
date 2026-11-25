@@ -11,18 +11,18 @@ Blueprint H절(토픽)과 F절(아키텍처) 원문이 없어서, Step 0~2 에�
 
 | 토픽 | 파티션 | 보관 | 메시지 키 | 내용 |
 |---|---|---|---|---|
-| `urban.traffic.speed.v1` | 3 | 72h | `link_id` | 도로 소통 |
-| `urban.traffic.incident.v1` | 1 | 72h | `acc_id` | 돌발 |
-| `urban.bus.position.v1` | 3 | 72h | `veh_id` | 버스 위치 |
-| `urban.bus.arrival.v1` | 3 | 72h | `route_id\|station_id` | 버스 도착 예측 (슬롯별) |
-| `urban.weather.observation.v1` | 1 | 72h | `nx\|ny` | 기상 실황 |
+| `urban.traffic.speed.v1` | 3 | 7d | `link_id` | 도로 소통 |
+| `urban.traffic.incident.v1` | 1 | 7d | `acc_id` | 돌발 |
+| `urban.bus.position.v1` | 3 | 7d | `veh_id` | 버스 위치 |
+| `urban.bus.arrival.v1` | 3 | 7d | `route_id\|station_id` | 버스 도착 예측 (슬롯별) |
+| `urban.weather.observation.v1` | 1 | 7d | `nx\|ny` | 기상 실황 |
 | `urban.dlq.v1` | 1 | 7d | 소스 이름 | 계약 위반 행, 해석 못 한 응답 |
 | `platform.audit` | 1 | 7d | 소스 이름 | 호출 시도 1회당 1건 |
 
 이유
 - **소스당 토픽 1개, 스키마당 1개**: 계약(`*_v1`)과 토픽이 1:1 이라 Spark 가 토픽별로 고정 스키마를 읽는다. 이름 끝 `.v1` 은 스키마 호환이 깨질 때 `.v2` 를 새로 만들어 옮기기 위한 것이다.
 - **키 = 같은 대상의 메시지가 같은 파티션**: 한 차량(한 링크)의 메시지 순서가 유지된다. 파티션 수(3/1)는 임시값이다 — 처리량을 측정한 뒤 정한다. 파티션을 늘리면 키 배치가 바뀌므로 `create_topics.py` 는 기존 토픽을 자동 변경하지 않고 경고만 한다.
-- **보관 72시간**: 원본은 `data/raw` 에 따로 있으므로 Kafka 는 재처리 완충 용도다. audit/DLQ 는 조사용이라 7일.
+- **보관 7일** (처음에는 72시간, 아래 '변경' 절): 원본은 `data/raw` 에 따로 있으므로 Kafka 는 재처리 완충 용도다. audit/DLQ 도 7일.
 - `platform.audit` 이름은 폴더 뼈대의 `collector/README.md`(Blueprint 기준)에 이미 있던 이름이다.
 
 ## 결정 2 — 메시지: JSON, 키 문자열, 타임스탬프 = event_time
@@ -88,6 +88,12 @@ Blueprint H절(토픽)과 F절(아키텍처) 원문이 없어서, Step 0~2 에�
 - `Connection: close`: 호출 간격이 60초 이상이라 연결 재사용의 이득이 없다. 60초 간격 측정에서 버스 서버만 `RemoteDisconnected` 가 40회 중 4번 났고 15~20초 간격에서는 55회 중 0번이었다(단측 p≈0.03, 표본이 작아 약한 증거, 원인은 확정 못 함). 매번 새 연결을 쓰면 '놀고 있는 연결을 서버가 닫는' 가능성이 사라진다.
 - **되돌리기:** `sources.yaml` 의 `timeout_sec` 를 `{connect: 5, read: 20, total: 60}` 으로, `fetch.py` 의 `"Connection": "close"` 를 지운다.
 - 확인할 것: 1시간 이상 연속 수집의 audit 에서 `attempts>=2` 비율과 `TotalTimeout` 건수.
+
+## 변경 (2026-11-20, STEP 3A)
+
+**보관 72시간 → 7일 (D-255, D-256).** Mac 을 4일 가까이 꺼 둔 사이 72시간이 지나 Bronze 체크포인트의 offset 이 지워졌고, Bronze 쿼리가 `OffsetOutOfRange` 로 멈췄다. 정지가 72시간을 넘는 일은 다시 생길 수 있다. 보관이 길어진 만큼 Kafka 볼륨이 커진다. 얼마나 커지는지는 재지 않았다 [미확인, 적용 뒤 `docker system df -v` 의 kafka-data 크기로 확인]. 토픽 설정은 만들 때만 적용되므로 `scripts/create_topics.py --check`(차이 확인)와 `--apply-config`(실행 중인 Kafka 에 적용)를 추가했다. 7일을 넘기면 여전히 같은 일이 생기고, 그때는 `scripts/bronze_recover.py` 로 복구한다(`docs/runbooks/step4-bronze.md` §8).
+
+**수집기를 컨테이너로 (D-268).** 처음에는 Kafka·Spark 와 달리 호스트에서 직접 실행했다(키를 `.env` 에서 바로 읽고, 고치고 다시 돌리기 쉬워서). 4주 연속 수집을 앞두고 터미널을 닫거나 재부팅하면 수집기만 빠지는 문제가 커졌다. `collector` 서비스는 키 두 개와 수집 대상 값만 환경 변수로 받고(`env_file` 없음), 원본 응답·호출 예산 폴더를 호스트와 같은 경로로 마운트해 호스트에서 돌던 예산을 이어 센다. 두 곳에서 동시에 돌면 예산 파일을 서로 덮어쓰므로 `scripts/stack.sh up-collector` 는 호스트 수집기가 돌고 있으면 시작을 거부한다. 호스트 실행(`python -m collector ...`)은 조사용으로 그대로 쓸 수 있다.
 
 ## 검증 상태 (정직하게)
 

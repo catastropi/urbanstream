@@ -140,7 +140,8 @@ def test_stage_env_is_a_whitelist_and_leaks_no_secrets(tmp_path):
     for secret in ("pgpw", "wpw", "jwt", "fk", "seoulkey", "dkey", "password=y"):
         assert secret not in blob
     assert set(env) <= set(J._ENV_PASS) | {"GOLD_SILVER_ROOT", "GOLD_BRONZE_ROOT", "GOLD_STAGE_ROOT", "PYTHONPATH",
-                                            "PYTHONDONTWRITEBYTECODE", "PYSPARK_SUBMIT_ARGS"}
+                                            "PYTHONDONTWRITEBYTECODE", "PYSPARK_SUBMIT_ARGS",
+                                            "GOLD_SILVER_REBUILD_ROOT", "SILVER_REBUILD_ROOT"}
     assert env["PATH"] == "/usr/bin" and env["JAVA_HOME"] == "/jvm"
     assert env["GOLD_STAGE_ROOT"] == str(tmp_path / "s")
     assert env["PYSPARK_SUBMIT_ARGS"] == "--master local[2] --driver-memory 1g pyspark-shell"

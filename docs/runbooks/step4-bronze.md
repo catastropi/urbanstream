@@ -18,7 +18,7 @@ python -m pytest -q
 
 기대: **`174 passed, 2 skipped`**. skipped 2개는 pyspark 가 필요한 테스트라서 이 환경(pyspark 없음)에서 건너뛰는 것이 정상입니다 (4번에서 컨테이너 안에서 돌립니다). 숫자가 다르면 일부 파일만 복사된 것일 수 있으니 출력 전체를 알려 주세요.
 
-수집기(`caffeinate -i python -m collector run`)와 core 스택(`scripts/stack.sh check` 8/8)은 켜져 있어야 합니다. 토픽에 메시지가 있어야 Bronze 에 쌓입니다.
+수집기(`scripts/stack.sh up-collector`)와 core 스택(`scripts/stack.sh check` 8/8)은 켜져 있어야 합니다. 토픽에 메시지가 있어야 Bronze 에 쌓입니다.
 
 ## 1. 이미지 빌드 + 기동 (첫 빌드는 수 분, 이미지 크기는 1~2 GB 정도로 추정)
 
@@ -167,49 +167,60 @@ mkdir -p data/bronze data/checkpoints
 
 그다음 `scripts/stack.sh up-streaming`.
 
-## 8. ⚠ Mac 을 72시간보다 오래 꺼 뒀다 켰더니 `spark-bronze` 가 unhealthy 일 때 (`OffsetOutOfRange`)
+## 8. ⚠ Mac 을 오래 꺼 뒀다 켰더니 `spark-bronze` 가 unhealthy 일 때 (`OffsetOutOfRange`)
 
-**무슨 일인가.** Kafka 는 메시지를 72시간만 보관합니다(`config/topics.yaml`, DLQ·audit 은 7일). 그보다 오래 꺼 두면 Bronze 체크포인트가 가리키는 offset 의 데이터가 이미 지워져 있고, 설계대로(`failOnDataLoss=true`, `streaming/bronze.py`) 쿼리가 유실을 숨기지 않고 **실패**합니다. 11-12 17:05 에 끄고 11-16 에 켰을 때 실제로 일어났습니다(DEFERRED D-255). 꺼 둔 동안은 수집기도 서 있었으므로 **그 구간의 데이터는 어디에도 없습니다.** 되살릴 것은 "앞으로"입니다.
+**무슨 일인가.** Kafka 는 메시지를 7일 보관합니다(`config/topics.yaml`. 11-19 까지는 72시간이었다, D-256). 그보다 오래 꺼 두면 Bronze 체크포인트가 가리키는 offset 의 데이터가 이미 지워져 있고, 설계대로(`failOnDataLoss=true`, `streaming/bronze.py`) 쿼리가 유실을 숨기지 않고 **실패**합니다. 11-12 17:05 에 끄고 11-16 에 켰을 때 실제로 일어났습니다(DEFERRED D-255). 꺼 둔 동안은 수집기도 서 있었으므로 **그 구간의 데이터는 어디에도 없습니다.** 되살릴 것은 "앞으로"입니다.
 
-**확인.** 로그에 `OffsetOutOfRange`(또는 `data may have been lost`)가 있고, 어느 토픽이 문제인지 본다.
+**확인.** 어느 표가 문제인지는 스크립트가 체크포인트와 Kafka 를 비교해 알려 준다(읽기만 한다).
 
 ```zsh
-docker compose --profile streaming logs --tail 400 spark-bronze | grep -i -E "OffsetOutOfRange|may have been lost|urban\.|platform\."
+python scripts/bronze_recover.py status
 ```
 
-토픽 → Bronze 표(폴더 이름): `urban.bus.arrival.v1`→`bus_arrival`, `urban.bus.position.v1`→`bus_position`, `urban.traffic.incident.v1`→`seoul_incident`, `urban.traffic.speed.v1`→`seoul_traffic`, `urban.weather.observation.v1`→`kma_ncst`[추정: 이름 대응], `urban.dlq.v1`→`dlq`, `platform.audit`→`audit`.
+`지워진 구간` 이 나온 표가 고칠 대상이다. 잃은 메시지 수도 같이 나온다. 로그로 확인하려면:
 
-**⚠ 가장 중요한 함정.** 체크포인트만 옮기면 안 됩니다. Spark 의 파일 싱크는 `data/bronze/<표>/_spark_metadata` 에 마지막으로 커밋한 batch id(예: 2034)를 기억하고, **그 번호 이하의 새 batch(새 체크포인트가 만든 72 같은 작은 번호)를 "이미 처리됨"으로 보고 조용히 건너뜁니다.** 쿼리는 건강해 보이는데 새 파일이 안 생깁니다(11-16 에 실제로 겪음). 그래서 **체크포인트와 `_spark_metadata` 를 같이** 옮깁니다. 옮긴 곳(`data/_old/`)에는 원본이 남으니 필요하면 되돌릴 수 있습니다.
+```zsh
+docker compose --profile streaming logs --tail 400 spark-bronze | grep -i -E "OffsetOutOfRange|may have been lost"
+```
 
-**복구 (문제가 난 표마다, 예: 3개).**
+**복구.** 체크포인트의 시작 위치만 'Kafka 에 남아 있는 가장 이른 offset' 으로 올린다. batch 번호와 `data/bronze/<표>/_spark_metadata` 는 그대로 두므로 이전 Bronze 파일이 계속 읽히고, 새 batch 도 건너뛰어지지 않는다. 바꾸기 전 파일은 `data/_recovery/<시각>/` 에 남는다.
 
 ```zsh
 docker compose --profile streaming stop spark-bronze
 ```
 
 ```zsh
-mkdir -p data/_old
+python scripts/bronze_recover.py reset all
 ```
 
-표 이름만 바꿔 한 번에 하나씩(아래는 `bus_arrival` 예). 한 줄이 길어도 그대로 한 줄로 실행한다.
+미리보기다. 바꿀 표와 offset 이 맞는지 보고 적용한다.
 
 ```zsh
-t=bus_arrival; mv data/checkpoints/bronze/$t data/_old/ckpt_${t}_$(date +%m%d%H%M); mv data/bronze/$t/_spark_metadata data/_old/meta_${t}_$(date +%m%d%H%M)
+python scripts/bronze_recover.py reset all --apply
 ```
 
 ```zsh
 scripts/stack.sh up-silver
 ```
 
-**성공 확인.** 몇 분 뒤 오늘 날짜의 새 폴더·파일이 생기고, Discord 에 `해소` 알림이 온다.
+**성공 확인.** `status` 가 모든 표를 `정상` 으로 보이고, 몇 분 뒤 오늘 날짜의 새 파일이 생긴다. Discord 에 `해소` 알림이 온다.
+
+```zsh
+python scripts/bronze_recover.py status
+```
 
 ```zsh
 ls data/bronze/bus_arrival | tail -3
 ```
 
-**하지 말 것.** 체크포인트만 옮기기. `data/bronze` 전체 삭제(이미 쌓인 Bronze 를 잃는다). `stack.sh reset`.
+**하지 말 것.**
+- 체크포인트만 옮기기. 새 쿼리의 batch 번호가 0 부터 다시 시작하는데 파일 싱크는 `_spark_metadata` 에 기록된 번호(예: 2034) 이하를 "이미 처리함"으로 보고 조용히 건너뛴다. 쿼리는 건강해 보이는데 새 파일이 안 생긴다(11-16 에 실제로 겪음. `tests/spark/test_bronze_recover_kafka.py` 가 재현한다).
+- 체크포인트와 `_spark_metadata` 를 함께 옮기기(11-16 에 쓴 방법). 새 파일은 쓰이지만 옮기기 전 Bronze 파일이 싱크 기록에서 빠져 Spark 로 읽으면 보이지 않는다(D-258 의 '초과' FAIL 원인).
+- `data/bronze` 전체 삭제, `stack.sh reset`.
 
-**예방.** 72시간 넘게 끌 일이 있으면 미리 알아 둔다 — 보관을 7일로 늘리는 선택(D-256, 디스크 더 사용)이 있다. 끄는 날짜·켜는 날짜는 `mac-on-off.md`.
+**11-16 에 옮긴 3개 표.** 그때 `data/_old/` 로 옮긴 `_spark_metadata` 때문에 11-16 이전 Bronze 파일이 Spark 에서 보이지 않는다. 되살리는 절차는 D-258 에 따로 적는다(아직 하지 않음).
+
+**예방.** 7일 넘게 끌 일이 있으면 미리 알아 둔다. 끄는 날짜·켜는 날짜는 `mac-on-off.md`.
 
 ## 알려진 한계 (정직하게)
 

@@ -11,7 +11,7 @@ from airflow.dag_processing.dagbag import DagBag  # noqa: E402
 DAGS = Path(__file__).resolve().parents[2] / "dags"
 EXPECTED = {"gold_intraday", "gold_daily", "backfill", "bus_delay", "baseline_build",
             "incident_impact_finalize", "weather_traffic_analysis", "warehouse_maintenance",
-            "dq_report_daily", "silver_reconcile_daily", "anomaly_scan"}
+            "dq_report_daily", "silver_reconcile_daily", "anomaly_scan", "reprocess"}
 
 
 @pytest.fixture(scope="module")
@@ -37,7 +37,8 @@ def test_policies(bag):
 
 
 def test_heavy_tasks_use_the_single_slot_pool(bag):
-    for dag_id, task_id in (("gold_intraday", "run"), ("gold_daily", "run"), ("backfill", "one_day"), ("silver_reconcile_daily", "reconcile")):
+    for dag_id, task_id in (("gold_intraday", "run"), ("gold_daily", "run"), ("backfill", "one_day"), ("silver_reconcile_daily", "reconcile"),
+                             ("reprocess", "one_day")):
         assert bag.dags[dag_id].get_task(task_id).pool == "gold_io", (dag_id, task_id)
 
 
@@ -45,6 +46,7 @@ def test_schedules(bag):
     assert bag.dags["gold_intraday"].schedule == "20 * * * *"
     assert bag.dags["gold_daily"].schedule == "0 1 * * *"
     assert bag.dags["backfill"].schedule is None
+    assert bag.dags["reprocess"].schedule is None                         # 수동 전용 (STEP 1)
     assert bag.dags["bus_delay"].schedule == "0 2 * * *"         # gold_daily(01:00) 다음
     assert bag.dags["baseline_build"].schedule == "30 2 * * 0"   # 일요일
     assert bag.dags["incident_impact_finalize"].schedule == "0 3 * * *"
@@ -85,3 +87,17 @@ def test_7c_dags_wiring_and_no_spark_pool(bag):
         assert all(t.pool != "gold_io" for t in d.tasks), dag_id      # SQL 만 쓰므로 Spark 풀을 잡지 않는다
     m = bag.dags["warehouse_maintenance"]
     assert m.get_task("snapshot").upstream_task_ids == {"analyze"} and m.get_task("prune").upstream_task_ids == {"snapshot"}
+
+
+def test_reprocess_params_require_reason_and_limit_choices(bag):
+    params = bag.dags["reprocess"].params
+    assert {"date_from", "date_to", "tables", "reason", "scope", "allow_shrink", "bronze_read_mode"} <= set(params)
+    assert params.get_param("reason").schema.get("minLength") == 1
+    assert params.get_param("scope").schema["enum"] == ["silver", "silver_gold", "gold"]
+    assert params["allow_shrink"] is False and params["bronze_read_mode"] == "listing"
+
+
+def test_reprocess_day_task_does_not_retry_by_itself(bag):
+    d = bag.dags["reprocess"]
+    assert d.get_task("one_day").retries == 0           # 무거운 빌드를 곧바로 한 번 더 하지 않는다
+    assert d.get_task("plan").retries == 1

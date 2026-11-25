@@ -72,6 +72,7 @@ def test_topics_config_is_consistent():
     topics = load_topics()
     assert topics.topics["urban.bus.position.v1"].partitions == 3
     assert topics.topics["platform.audit"].retention_ms == 604800000
+    assert topics.topics["urban.traffic.speed.v1"].retention_ms == 604800000   # 기본 7일 (D-256)
     assert parse_hhmm("24:00") == 1440 and parse_hhmm("04:30") == 270
     with pytest.raises(ConfigError):
         parse_hhmm("25:00")

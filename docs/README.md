@@ -16,6 +16,7 @@
   - `0012-step10-dashboard.md` — Step 10 대시보드(Streamlit)·API 전용 입구·대시보드 키 분리·호출 예산·정직한 표시 규칙·컨테이너·Tableau CSV(옵션 A)
   - `0013-step11-ci-cd.md` — Step 11 시험 계층 마커·GitHub Actions(CI·주간·릴리스)·비밀 스캔·GHCR·비용
   - `0014-step12-azure-evidence-deploy.md` — Step 12 Azure 최소 증거 배포: VM 1대·NSG SSH 전용·compose 오버라이드·스냅샷 복원·터널·destroy (D12-1~12)
+  - `0015-reprocess.md` — STEP 1 Bronze→Silver 재처리(별도 루트 + 날짜별 포인터)와 Gold 범위 교체(재처리 경로에서만, 한 트랜잭션)
 - `evidence/step12/` — Step 12 증거 이미지 19장(마스킹함)과 설명 `README.md` (Azure 배포·접속·비용·파괴).
 - `runbooks/` — 절차서.
   - `step0-closeout.md` — Step 0 마무리 측정·확인 (사용자가 Mac 에서 실행)
@@ -24,6 +25,7 @@
   - `step4-bronze.md` — Bronze(Spark) 첫 실행·검증·복구 (사용자가 Mac 에서 실행)
   - `step5-silver.md` — Silver 준비: 5-0 Bronze 프로파일링 (진행 중)
   - `step6-gold.md` · `step7a-airflow.md` · `step7b-marts.md` · `step7c-marts.md` · `step8-recovery.md` — Gold / Airflow / 마트 / 복구 훈련
+  - `reprocess.md` — 재처리 실행·확인·실패 처리·되돌리기·옛 버전 정리
   - `step9-api.md` — API 기동·점검(curl)·오류 코드·테스트·키 교체 (사용자가 Mac 에서 실행)
   - `step10-dashboard.md` — 대시보드 기동·화면 확인·메모리·Tableau CSV 만들기와 게시 전 점검 (사용자가 Mac 에서 실행)
   - `mac-on-off.md` — Mac 에서 스택·수집기를 끄고 켜는 절차, 절전(덮개 닫힘) 주의 (사용자가 Mac 에서 실행, Step 12 전)

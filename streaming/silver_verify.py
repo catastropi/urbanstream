@@ -11,13 +11,17 @@ Silver 는 Bronze 를 뒤따라가므로, Silver 가 처리한 마지막 `fetche
 비교 구간: 기본은 전체 이력. SILVER_VERIFY_LOOKBACK_DAYS(최근 N일) 또는 SILVER_VERIFY_SINCE(YYYY-MM-DD, KST)를 주면 그 이후만 읽는다
 (파티션 날짜로 먼저 걸러 읽는 파일 수가 줄어든다). Airflow 의 silver_reconcile_daily 는 기본 1일로 돌린다 (D-258).
 
+Silver 쪽은 streaming/silver_read.read_silver 로 읽는다(재처리로 게시된 날짜는 그 버전). 게시된 날짜에 재처리 뒤 스트리밍이 행을 더 쓰면
+그 행은 가려진다 → "[재처리 뒤 늦은 행]" 줄로 알린다(실패로 만들지 않는다. 같은 날짜를 다시 재처리하면 반영된다).
+
 실행: scripts/silver_verify.sh   (docs/runbooks/step5-silver.md)
 """
 from __future__ import annotations
 
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import date as _date, datetime, timedelta
+from pathlib import Path
 from typing import Optional
 
 from pyspark import StorageLevel
@@ -25,6 +29,8 @@ from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 
 from streaming.silver_config import SilverConfig, SilverTable, load_silver_tables, verify_since
+from streaming.silver_pointer import active_dates, load_build
+from streaming.silver_read import read_silver
 from streaming.verify_bronze import read_bronze
 
 MARGIN_SEC = 900
@@ -114,6 +120,26 @@ def incident_sample(silver: DataFrame, n: int = 6) -> list[dict]:
     return [r.asDict() for r in rows]
 
 
+def late_rows(stream: Optional[DataFrame], rebuild_root: str, table: SilverTable, dates: dict[str, str],
+              since: Optional[datetime] = None) -> dict[str, int]:
+    """게시된 날짜마다, 재처리가 읽은 Bronze 의 마지막 적재 시각 뒤에 스트리밍 루트에 들어온 행 수 (0 인 날짜는 뺀다)."""
+    if stream is None or not dates:
+        return {}
+    first = None if since is None else (since + timedelta(hours=9)).date() - timedelta(days=1)
+    out: dict[str, int] = {}
+    for d, v in sorted(dates.items()):
+        if first is not None and _date.fromisoformat(d) < first:
+            continue
+        t = load_build(Path(rebuild_root), table.name, v).get("bronze_max_ingested_at")
+        q = stream.filter(F.col(table.partition_col) == F.lit(_date.fromisoformat(d)))
+        if t:
+            q = q.filter(F.col("ingested_at") > F.to_timestamp(F.lit(t)))      # ISO 문자열(+00:00)
+        n = q.count()
+        if n:
+            out[d] = n
+    return out
+
+
 def _since_note(r: dict) -> str:
     return f" | 구간 fetched_at ≥ {r['since']:%Y-%m-%d %H:%M:%S}Z" if r.get("since") else " | 구간 전체 이력"
 
@@ -143,7 +169,8 @@ def main() -> int:
             if b is None:
                 lines.append({"ok": True, "text": f"{t.name:<28} OK   Bronze 비어 있음"})
                 continue
-            silver = read_bronze(spark, f"{cfg.silver_root}/{t.name}")
+            dates = active_dates(Path(cfg.rebuild_root), t.name)          # 한 번 읽은 스냅샷을 이 표 끝까지 쓴다
+            silver = read_silver(spark, cfg.silver_root, cfg.rebuild_root, t.name, t.partition_col, dates)
             # 한 번 자르고 한 번만 읽는다. 시간 검사·돌발 표본도 같은 구간을 쓴다 (자르지 않으면 구간을 주어도 Silver 전체 이력을 읽는다. D-258).
             b_w = cached(windowed(b, bronze_partition_col(t), since), since)
             silver_w = cached(windowed(silver, t.partition_col, since), since)
@@ -158,6 +185,9 @@ def main() -> int:
                 ok = ok and tc["future_event"] == 0 and tc["reversal"] == 0
                 text += f" | 미래 시각 {tc['future_event']} · 시간 역전 {tc['reversal']}" + ("" if ok else "  ← FAIL")
             lines.append({"ok": ok, "text": text})
+            for d, n in late_rows(read_bronze(spark, f"{cfg.silver_root}/{t.name}") if dates else None,
+                                  cfg.rebuild_root, t, dates, since).items():
+                lines.append({"ok": True, "text": f"    [재처리 뒤 늦은 행] {t.name} {d}: 스트리밍에 {n:,}건이 더 들어와 가려져 있습니다. 같은 날짜를 다시 재처리하세요"})
             if silver is not None and t.source == "seoul_incident":
                 for x in incident_sample(silver_w):
                     lines.append({"ok": True, "text": f"    [좌표 확인용] {x['acc_id']}  lon {x['lon']:.5f} lat {x['lat']:.5f}  {x['days'] if x['days'] is None else round(x['days'], 1)}일{' (장기)' if x['long'] else ''}  {(x['description'] or '')[:40]}"

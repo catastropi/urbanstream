@@ -213,6 +213,12 @@ jobs:
         run: |
           python scripts/ci_checks.py image-guard urbanstream/dashboard:ci
           docker run --rm --entrypoint python urbanstream/dashboard:ci -c "import dashboard.client, dashboard.contract"
+      - name: collector 이미지 빌드 (푸시하지 않음)
+        run: docker build -f docker/collector/Dockerfile -t urbanstream/collector:ci .
+      - name: collector 이미지 검사 + 설정 읽기 시험 (네트워크·키 없이)
+        run: |
+          python scripts/ci_checks.py image-guard urbanstream/collector:ci
+          docker run --rm urbanstream/collector:ci python -m collector status
 
   terraform:
     # Step 12: Terraform 형식·문법만 본다(apply·plan 은 CI 에서 하지 않는다). 바이너리는 sha256 고정(scripts/ci_terraform.py) — 서드파티 액션을 쓰지 않는다.

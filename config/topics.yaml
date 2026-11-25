@@ -6,7 +6,9 @@
 # 파티션 수는 임시값이다. 단일 브로커 개발 환경이라 복제 수는 1.
 defaults:
   replication_factor: 1
-  retention_ms: 259200000        # 72시간. 원본은 data/raw 에 따로 보관되므로 Kafka 는 재처리 완충 용도
+  # 7일. 72시간이던 때 Mac 을 4일 넘게 꺼서 Bronze 가 OffsetOutOfRange 로 멈춘 적이 있다(D-255, D-256).
+  # 원본은 data/raw 에 따로 보관되므로 Kafka 는 재처리 완충 용도다. 이미 있는 토픽에는 create_topics.py --apply-config 로 반영한다.
+  retention_ms: 604800000
 
 topics:
   urban.traffic.speed.v1:        {partitions: 3}   # key = link_id

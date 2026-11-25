@@ -1,6 +1,6 @@
 # Mac 끄기·켜기 런북 (Step 12 전, Mac 에서 스택을 돌리는 동안)
 
-**사용자가 Mac 에서 실행하는 순서입니다.** 비밀 값은 채팅·git 어디에도 붙이지 않습니다. 근거: DEFERRED D-222(Mac 절전), D-211·D-212(Airflow OOM), D-214(재시작 정책).
+Mac 에서 실행하는 순서. 비밀 값은 git·이슈·메신저 어디에도 붙이지 않는다. 근거: DEFERRED D-222(Mac 절전), D-211·D-212(Airflow OOM), D-214(재시작 정책).
 
 ## 0. 먼저 알아둘 것
 - **계속 켜 둘 필요는 없다.** 끄고 켜는 절차만 지키면 된다. 꺼 둔 시간만큼 수집에 **빈 구간**이 생기고, 공공 API 는 실시간 값이라 **나중에 채울 수 없다.**
@@ -9,7 +9,13 @@
 
 ## 1. 끌 때
 
-1. 수집기가 도는 터미널에서 **Ctrl+C**. (먼저 멈추면 이미 들어간 데이터는 Bronze·Silver 로 정상 처리된다. 몇 분 기다리면 더 안전하지만 필수는 아니다 — 메시지는 Kafka 에 72시간 남고 Spark 는 체크포인트에서 이어 받는다.)
+1. 수집기를 먼저 멈춘다. 먼저 멈추면 이미 들어간 데이터는 Bronze·Silver 로 정상 처리된다. 몇 분 기다리면 더 안전하지만 필수는 아니다(메시지는 Kafka 에 7일 남고 Spark 는 체크포인트에서 이어 받는다).
+
+```zsh
+docker compose --profile collector stop collector
+```
+
+(예전처럼 호스트에서 돌리고 있으면 그 터미널에서 Ctrl+C)
 
 ```zsh
 scripts/stack.sh down
@@ -58,17 +64,23 @@ scripts/stack.sh ps
 scripts/stack.sh check
 ```
 
-4. **마지막에** 수집기를 시작한다(Kafka 가 먼저 떠 있어야 한다).
+4. **마지막에** 수집기를 시작한다(Kafka 가 먼저 떠 있어야 한다). 컨테이너로 돈다. 호스트에서 수집기가 돌고 있으면 시작을 거부한다(예산 파일을 같이 쓰기 때문).
 
 ```zsh
-caffeinate -i python -m collector run
+scripts/stack.sh up-collector
 ```
 
-다른 터미널에서 호출 예산 확인:
+로그와 호출 예산 확인(예산은 호스트에서 돌던 때와 같은 `data/collector/budget.json` 을 이어 쓴다):
+
+```zsh
+scripts/stack.sh logs collector
+```
 
 ```zsh
 python -m collector status
 ```
+
+컨테이너가 안 될 때의 예전 방법: `caffeinate -i python -m collector run` (컨테이너를 먼저 멈춘다).
 
 ## 3. 켠 뒤 알아둘 것
 - **Airflow 는 꺼진 동안 못 돈 실행을 따라잡지 않는다.** 모든 DAG 가 `catchup=False` — 꺼져 있던 시간대의 Gold·마트는 비어 있다. 필요하면 `backfill` DAG 로 수동 보충(HANDOFF 7장).
@@ -92,11 +104,17 @@ sudo pmset -a disablesleep 0
 ```
 
 - 첫 명령은 닫기 전, 둘째는 연 뒤. 상태 확인은 `pmset -g | grep -i sleep`.
-- **덮개를 연 채 화면만 꺼지는 것은 괜찮다.** `caffeinate -i` 가 수집기를 살려 둔다. 문제는 덮개를 닫아서 자는 것뿐이다.
+- **덮개를 연 채 화면만 꺼지는 것은 괜찮다.** 전원이 연결돼 있으면 시스템 설정의 '디스플레이가 꺼져 있을 때 자동으로 잠자기 방지'를 켜 두거나, 터미널 하나에서 `caffeinate -i` 를 띄워 둔다(수집기가 컨테이너라 예전처럼 수집기 명령에 붙일 수 없다). 문제는 덮개를 닫아서 자는 것뿐이다.
 - 이 방식으로 하루 이상 돌려 안정적이었다는 **실측은 없다**(D-260). 처음에는 `scripts/stack.sh stats` 로 scheduler 메모리를 자주 본다.
 
-## 5. 72시간보다 오래 꺼 뒀다 켰을 때
-Kafka 보존 72시간(DLQ·audit 7일)이 지나서 `spark-bronze` 가 `OffsetOutOfRange` 로 unhealthy 가 될 수 있다. 그 구간의 데이터는 어디에도 없다(수집기도 꺼져 있었다). **복구는 `docs/runbooks/step4-bronze.md` §8** — 체크포인트와 `_spark_metadata` 를 **함께** 옮겨야 한다. 켠 뒤 `up-silver` 가 unhealthy 로 끝나면 먼저 로그에서 `OffsetOutOfRange` 부터 찾는다.
+## 5. 7일보다 오래 꺼 뒀다 켰을 때
+Kafka 보존 7일(11-19 까지는 72시간)이 지나서 `spark-bronze` 가 `OffsetOutOfRange` 로 unhealthy 가 될 수 있다. 그 구간의 데이터는 어디에도 없다(수집기도 꺼져 있었다). 켠 뒤 `up-silver` 가 unhealthy 로 끝나면 먼저 이것부터 본다.
+
+```zsh
+python scripts/bronze_recover.py status
+```
+
+**복구는 `docs/runbooks/step4-bronze.md` §8** (`bronze_recover.py reset`). 체크포인트나 `_spark_metadata` 를 손으로 옮기지 않는다.
 
 추가로 긴 정지 뒤에는: `up-airflow` 직후 scheduler 메모리(`scripts/stack.sh stats`)를 본다. Airflow 는 `catchup=False` 라 못 돈 실행을 따라잡지 않지만, 깨어난 직후 몇 시간치 `gold_intraday` 가 몰릴 수 있다. 4 GiB 에 가까워지면 scheduler 를 멈춘다(`docker compose stop airflow-scheduler`, 안 멈추면 `docker ps` 로 이름을 보고 `docker kill`). `silver_reconcile_daily`(04:30)의 `silver_verify` 는 최근 1일 구간만 비교하므로 정지 길이와는 무관하다(D-258). 다만 구간을 잘라도 30분을 넘기면 시간 초과이니 Mac 실측 결과를 D-258 에서 확인한다.
 

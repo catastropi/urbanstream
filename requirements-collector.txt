@@ -1,0 +1,6 @@
+# collector 컨테이너 의존성 (docker/collector/Dockerfile 이 이것만 설치한다). 호스트에서 쓰던 버전(requirements-lock.txt)과 같다.
+# requests 가 끌어오는 certifi·idna·urllib3·charset-normalizer 는 고정하지 않는다. 올릴 때는 tests/unit/collector 가 통과하는지 먼저 본다.
+confluent-kafka==2.16.1
+python-dotenv==1.2.4
+PyYAML==6.0.3
+requests==2.34.2

@@ -35,6 +35,7 @@ class SilverConfig:
     bronze_root: str = "/data/bronze"
     silver_root: str = "/data/silver"
     checkpoint_root: str = "/data/checkpoints/silver"
+    rebuild_root: str = "/data/silver_rebuild"     # 재처리 버전·날짜별 포인터 (STEP 1, batch/silver_rebuild.py). 스트리밍 쿼리는 쓰지 않는다
     config_dir: str = str(ROOT / "config")
     trigger_sec: int = 60
     max_files_per_trigger: Optional[int] = 1000
@@ -51,6 +52,7 @@ class SilverConfig:
             bronze_root=e.get("SILVER_BRONZE_ROOT", cls.bronze_root),
             silver_root=e.get("SILVER_ROOT", cls.silver_root),
             checkpoint_root=e.get("SILVER_CHECKPOINT_ROOT", cls.checkpoint_root),
+            rebuild_root=e.get("SILVER_REBUILD_ROOT", cls.rebuild_root),
             config_dir=config_dir,
             trigger_sec=int(y["trigger_sec"]),
             max_files_per_trigger=int(mf) if mf else None,

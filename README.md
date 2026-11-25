@@ -69,9 +69,11 @@ Azure에 올렸던 서빙 계층에서 캡처한 화면입니다(11-12 시점 �
 
 기록은 `docs/DEFERRED.md`(P장)와 `docs/runbooks/`에 있습니다.
 
-- **Kafka 보존 기간을 넘겨 Bronze가 멈춤(D-255).** Mac을 4일 가까이 껐다 켰더니 체크포인트가 가리키던 offset의 데이터가 Kafka(보존 72시간)에서 지워져 있었습니다. 유실을 숨기지 않으려고 `failOnDataLoss`를 켜 둔 설정이 그대로 작동한 것입니다. 체크포인트만 비우면 새 batch가 `_spark_metadata`의 마지막 커밋 기록 때문에 조용히 건너뛰어진다는 것을 확인했고, 둘을 같이 옮겨서 복구했습니다. 꺼져 있던 구간의 데이터는 복구하지 못했습니다.
+- **Kafka 보존 기간을 넘겨 Bronze가 멈춤(D-255).** Mac을 4일 가까이 껐다 켰더니 체크포인트가 가리키던 offset의 데이터가 Kafka(보존 72시간)에서 지워져 있었습니다. 유실을 숨기지 않으려고 `failOnDataLoss`를 켜 둔 설정이 그대로 작동한 것입니다. 체크포인트만 비우면 새 batch가 `_spark_metadata`의 마지막 커밋 기록 때문에 조용히 건너뛰어진다는 것을 확인했고, 그때는 둘을 같이 옮겨서 복구했는데, 그러면 옮기기 전 Bronze 파일이 sink 기록에서 빠져 Spark에서 보이지 않는다는 문제가 남았습니다(D-258). 지금은 보존을 7일로 늘렸고, 체크포인트의 시작 위치만 Kafka에 남은 가장 이른 offset으로 올리는 `scripts/bronze_recover.py`로 복구합니다(실제 Kafka로 재현·복구하는 시험 포함). 꺼져 있던 구간의 데이터는 복구하지 못했습니다.
 - **Mac 절전으로 수집이 거의 멈춤(D-222).** 11-07 하루의 `pmset` 로그에서 절전 진입 115회, 깨어 있던 시간은 합쳐서 약 37분이었습니다. 수집기가 깨어날 때 잠들어 있던 시간을 이벤트로 남기게 했고, 덮개를 닫고 돌리는 절차를 런북에 적었습니다(덮개를 닫고 하루 이상 돌려 본 실측은 없습니다).
-- **Airflow 컨테이너 메모리 부족(D-211, D-212, D-257).** 절전 때문에 scheduler heartbeat가 100초 넘게 끊기자 실행 중이던 Gold 작업이 "고아"로 판정되어 같은 작업이 한 컨테이너에서 두 번 돌았고, 작업 하나가 약 1.6 GiB라 메모리 한도를 넘어 컨테이너가 종료됐습니다(11-09). 한도를 올려 재기동했지만 근본 원인은 한도가 아니라 절전 주기라고 보고 있고, 구조적인 해법은 보류했습니다. 11-17에도 scheduler가 한도 직전(3.99 GiB / 4 GiB)까지 올라 `docker kill`로 정리했습니다.
+- **Airflow 컨테이너 메모리 부족(D-211, D-212, D-257).** 절전 때문에 scheduler heartbeat가 100초 넘게 끊기자 실행 중이던 Gold 작업이 "고아"로 판정되어 같은 작업이 한 컨테이너에서 두 번 돌았고, 작업 하나가 약 1.6 GiB라 메모리 한도를 넘어 컨테이너가 종료됐습니다(11-09). 11-17에도 scheduler가 한도 직전(3.99 GiB / 4 GiB)까지 올라 `docker kill`로 정리했습니다. 그 뒤 Gold의 Spark를 scheduler에서 빼서 `gold-runner` 컨테이너가 요청 파일을 하나씩 처리하게 바꿨습니다. 같은 작업이 두 번 요청돼도 Spark는 한 번에 하나만 뜹니다. Mac에서 바꾼 뒤의 메모리 실측은 아직 없습니다.
+
+- **재처리가 Mac 전체를 느리게 함(D-280~D-282).** 첫 재처리가 작은 파일을 표마다 여러 번 읽어 30분 한도를 넘겼고, CPU 4개가 꽉 차면서 Kafka healthcheck JVM 이 제한 시간 안에 뜨지 못해 Kafka 와 그 뒤 컨테이너가 연달아 unhealthy 가 됐습니다. 읽기를 한 번으로 줄이고, 재처리를 낮은 우선순위로 돌리고, Kafka·Airflow 의 검사와 동시 실행 상한을 고쳤습니다. 하루치 재처리는 표별로 41~241초가 됐습니다.
 
 ## Azure 배포
 
@@ -104,7 +106,8 @@ cp .env.example .env            # SEOUL_API_KEY, DATA_GO_KR_KEY 를 채운다 (�
 scripts/stack.sh init-env       # 나머지 비밀 값 자동 생성
 scripts/stack.sh up-dev         # PostGIS + Kafka + Kafka UI
 python scripts/create_topics.py
-python -m collector once        # 한 사이클 확인 → 상시: caffeinate -i python -m collector run
+python -m collector once        # 한 사이클 확인 (호스트에서)
+scripts/stack.sh up-collector   # 상시 수집 (컨테이너)
 scripts/stack.sh up-silver      # Bronze·Silver
 scripts/stack.sh up-airflow     # Airflow
 scripts/stack.sh up-api         # http://127.0.0.1:8010/docs

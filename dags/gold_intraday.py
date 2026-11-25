@@ -1,7 +1,8 @@
-"""gold_intraday — 매시 20분, '오늘(KST)' 윈도우만 Silver→Gold 로 다시 쌓는다.
+"""gold_intraday — 매시 20분, 지난 실행 뒤 새로 생긴 Silver 파일만 Gold 로 적재한다 (증분, D-278).
 
-수렴형: 실행이 몇 번 빠져도(Mac 절전) 다음 실행이 같은 윈도우를 다시 처리해 메운다.
-팩트는 DO NOTHING, 날씨/에피소드/감사는 DO UPDATE 라 반복 실행해도 결과가 같다(멱등).
+예전에는 '오늘(KST)' 하루를 매번 다시 읽어 밤이 되면 30분을 넘었다. 이제 진행 기록(data/gold_stage/_state/gold_facts.json)
+이후의 파일만 읽고, 실행이 몇 번 빠지면(Mac 절전) 다음 실행이 3시간씩 나눠 따라잡는다. 볼 날짜 폴더는 어제·오늘이다.
+팩트는 DO NOTHING, 날씨·감사는 DO UPDATE, 수명은 합치기라 겹쳐 읽어도 결과가 같다(멱등).
 무거운 import(pyspark, psycopg)는 batch.jobs 안에서 지연 import 된다.
 """
 from __future__ import annotations
@@ -32,7 +33,7 @@ def gold_intraday():
                                   getattr(ctx.get("dag_run"), "run_after", None))
         d0, d1 = jobs.window_intraday(anchor)
         ti = ctx["ti"]
-        return jobs.process_window(d0, d1, dag_id=ti.dag_id, run_id=ti.run_id, try_number=ti.try_number, refresh_mart=False)
+        return jobs.process_incremental(d0, d1, dag_id=ti.dag_id, run_id=ti.run_id, try_number=ti.try_number, refresh_mart=False)
 
     run()
 

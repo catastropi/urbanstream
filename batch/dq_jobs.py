@@ -90,6 +90,7 @@ def run_silver_reconcile(*, connect: Optional[Callable[[], Any]] = None, runner:
     env = stage_env(Path("/tmp/silver_reconcile"), silver_root=os.environ.get("GOLD_SILVER_ROOT", "/data/silver"),
                     bronze_root=os.environ.get("GOLD_BRONZE_ROOT", "/data/bronze"))
     env.update({"SILVER_BRONZE_ROOT": env["GOLD_BRONZE_ROOT"], "SILVER_ROOT": env["GOLD_SILVER_ROOT"], "SILVER_CONFIG_DIR": str(ROOT / "config"),
+                "SILVER_REBUILD_ROOT": os.environ.get("GOLD_SILVER_REBUILD_ROOT", "/data/silver_rebuild"),
                 "SILVER_VERIFY_LOOKBACK_DAYS": os.environ.get("SILVER_VERIFY_LOOKBACK_DAYS", "1")})
     try:
         proc = runner([sys.executable, "-m", "streaming.silver_verify"], cwd=str(ROOT), env=env, capture_output=True, text=True, timeout=timeout_sec)

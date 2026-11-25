@@ -2,7 +2,8 @@
 
 하루 단위 mapped 태스크이고 풀(gold_io, 슬롯 1)이라 동시에 하나씩만 돈다.
 한 날이 실패해도 그 날 스테이징 폴더가 남고, 재시도하면 그 날부터 다시 한다. 마트는 마지막에 한 번만 갱신한다.
-이 DAG 는 Silver 에 이미 있는 데이터를 다시 쌓는다. Bronze 에서 Silver 를 다시 만드는 backfill_from_raw 는 ADR-0009 에서 보류.
+이 DAG 는 Silver 에 이미 있는 데이터를 다시 쌓는다(팩트는 DO NOTHING 이라 이미 있는 행은 바뀌지 않는다).
+Bronze 에서 Silver 를 다시 만들고 Gold 범위를 교체하는 것은 `reprocess` DAG 다 (ADR-0015).
 """
 from __future__ import annotations
 

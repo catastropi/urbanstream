@@ -72,15 +72,27 @@ docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
 
 ## 5. 계속 수집
 
+상시 수집은 컨테이너로 돌린다(`docker-compose.yml` 의 `collector`). 호스트에서 수집기가 돌고 있으면 시작을 거부한다.
+
+```zsh
+scripts/stack.sh up-collector
+```
+
+```zsh
+scripts/stack.sh logs collector
+```
+
+호스트에서 직접 돌리는 방법(문제 조사용. 컨테이너를 먼저 멈춘다):
+
 ```zsh
 python -m collector run
 ```
 
 - 로그가 호출마다 한 줄씩 나옵니다: `[bus_position:100100118] ok attempts=1 records=13 ... budget=12/1000`.
-- 종료는 `Ctrl+C` (현재 사이클을 마치고 정리 후 종료, 오늘 예산 사용량 출력).
+- 종료는 `docker compose --profile collector stop collector`, 호스트에서는 `Ctrl+C` (현재 사이클을 마치고 정리 후 종료, 오늘 예산 사용량 출력).
 - 10~20분 돌려 보고, 다른 터미널에서 `python -m collector status` 와 `scripts/stack.sh stats` 를 확인하세요.
 - 호출 1회의 총 제한시간은 15초입니다(`timeout_sec.total`). 넘으면 `TotalTimeout` 으로 기록되고 재시도합니다. 한 소스가 느려도 다른 소스의 간격은 유지됩니다(소스별 스레드). 이상하면 `python -m collector run --sequential` 로 비교해 보세요.
-- 노트북이 잠들면 수집이 멈춥니다(수집은 Mac 의 프로세스). 장시간 수집하려면 잠자기 방지가 필요합니다: `caffeinate -i python -m collector run`.
+- 노트북이 잠들면 컨테이너도 같이 멈춥니다(Docker VM 이 멈춘다). 장시간 수집하려면 잠자기 방지가 필요합니다(`mac-on-off.md` 4절).
 
 ## 6. 문제 해결
 
