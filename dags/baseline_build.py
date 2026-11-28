@@ -32,7 +32,7 @@ def baseline_build():
         today = jobs.kst_date(anchor)
         # 일요일 02:30 에는 01:00 gold_daily(어제~오늘)가 끝나 있어야 한다. 오늘을 덮는 성공한 적재가 최근 72시간 안에 있으면 통과.
         run_id = marts.require_recent_load(today, today, max_age_hours=72)
-        dq_jobs.require_dq_ok("baseline_build")          # 관찰 기간이 끝난 block_mart 규칙(시각 이상)이 fail 이면 여기서 멈춘다 — 지금은 사실상 통과
+        dq_jobs.require_dq_ok("baseline_build")          # block_mart 규칙이 fail 이면 재시도 없이 바로 실패한다(DQ 결과는 05:00 에만 바뀐다). 적재 확인은 재시도한다
         return run_id
 
     @task(on_failure_callback=jobs.on_failure, execution_timeout=pendulum.duration(minutes=30))

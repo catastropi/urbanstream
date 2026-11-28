@@ -16,6 +16,12 @@ import pytest
 from batch import jobs as J
 from urbanstream import notify
 
+@pytest.fixture(autouse=True)
+def _no_job_lock(monkeypatch):
+    """작업 잠금(PostgreSQL)은 tests/integration/test_job_lock_pg.py 가 본다. 여기서는 DB 없이 흐름만 본다."""
+    monkeypatch.setattr(J, "job_lock", J.no_lock)
+
+
 ROOT = Path(__file__).resolve().parents[2]
 UTC = timezone.utc
 

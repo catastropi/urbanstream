@@ -25,6 +25,7 @@ def test_process_window_end_to_end_is_idempotent_and_cleans_up(spark, tmp_path, 
     monkeypatch.setenv("GOLD_SILVER_ROOT", str(silver))
     monkeypatch.setenv("GOLD_BRONZE_ROOT", str(bronze))
     monkeypatch.setenv("POSTGRES_PASSWORD", "must-not-leak")          # 서브프로세스 환경에 들어가면 안 되는 값
+    monkeypatch.setenv("GOLD_DSN", dsn)                               # 작업 잠금(job_lock)도 실제 PG 로 잡는다 (STEP 3B)
 
     def go(run_id, try_number=1):
         return J.process_window(
@@ -52,6 +53,7 @@ def test_process_window_end_to_end_is_idempotent_and_cleans_up(spark, tmp_path, 
 
 
 def test_process_window_fails_fast_when_silver_is_missing(tmp_path, pg, monkeypatch):
+    monkeypatch.setenv("GOLD_DSN", os.environ["GOLD_TEST_DSN"])
     monkeypatch.setenv("GOLD_SILVER_ROOT", str(tmp_path / "nope"))
     monkeypatch.setenv("GOLD_BRONZE_ROOT", str(tmp_path / "nope2"))
     with pytest.raises(J.JobError):

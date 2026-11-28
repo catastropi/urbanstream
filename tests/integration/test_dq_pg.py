@@ -9,7 +9,7 @@ import pytest
 from pg_support import pg  # noqa: F401
 from urbanstream.dq import checks as C, engine, rules as R
 from batch import dq_jobs
-from batch.jobs import JobError
+from batch.jobs import JobError, no_lock
 
 pytestmark = pytest.mark.pg
 KST = timezone(timedelta(hours=9))
@@ -278,13 +278,13 @@ def test_silver_reconcile_records_per_table_and_alerts_on_fail(pg):
         stdout = "silver_traffic_speed         OK   Bronze 10행\nsilver_weather               FAIL Bronze 3행 유실 2\n"
         stderr = ""
     sent = []
-    out = dq_jobs.run_silver_reconcile(connect=conn_of(pg), runner=lambda *a, **k: P(), send=lambda *a, **k: sent.append(a), run_date=D)
+    out = dq_jobs.run_silver_reconcile(lock=no_lock, mode="inline", connect=conn_of(pg), runner=lambda *a, **k: P(), send=lambda *a, **k: sent.append(a), run_date=D)
     assert out["pass"] == 1 and out["fail"] == 1
     assert pg.execute("SELECT target, status FROM ops.dq_result WHERE rule_id='silver_reconcile' ORDER BY target").fetchall() == [("silver_traffic_speed", "pass"), ("silver_weather", "fail")]
     assert len(sent) == 1 and sent[0][0] == "error"
     P.stdout, P.returncode = "", 2
     with pytest.raises(JobError):
-        dq_jobs.run_silver_reconcile(connect=conn_of(pg), runner=lambda *a, **k: P(), send=lambda *a, **k: None, run_date=D)
+        dq_jobs.run_silver_reconcile(lock=no_lock, mode="inline", connect=conn_of(pg), runner=lambda *a, **k: P(), send=lambda *a, **k: None, run_date=D)
 
 
 def test_every_real_rule_runs_as_gold_writer_without_check_error(pg):
@@ -310,3 +310,23 @@ def test_gold_writer_can_read_every_mart_view(pg):
             pg.execute(f"SELECT count(*) FROM mart.{v}").fetchone()
     finally:
         pg.execute("RESET ROLE")
+
+
+def test_silver_reconcile_in_runner_mode_reads_table_lines_from_the_runner_output(pg, tmp_path):
+    """STEP 3B: 기본(runner) 모드에서는 scheduler 가 Spark 를 띄우지 않고 gold-runner 요청만 남긴다. 대조 실패(코드 1)도 결과로 기록된다."""
+    from batch import stage_runner as SR
+    asked = []
+
+    def request(kind, d0, d1, sd, *, args, base, timeout_sec):
+        asked.append((kind, d0, args, sd))
+        req = SR.requests_dir(base)
+        req.mkdir(parents=True, exist_ok=True)
+        SR.marker(req, "v1", "out").write_text("silver_traffic_speed         OK   Bronze 10행\nsilver_weather               FAIL 유실 2\n",
+                                               encoding="utf-8")
+        sd.mkdir(parents=True)
+        return {"returncode": 1, "stdout_tail": "", "_id": "v1", "_stage_dir": str(sd)}
+    out = dq_jobs.run_silver_reconcile(lock=no_lock, mode="runner", request=request, base=tmp_path, connect=conn_of(pg),
+                                       send=lambda *a, **k: None, run_date=D)
+    assert asked[0][0] == "silver_verify" and asked[0][2] == {"lookback_days": "1"}
+    assert out["pass"] == 1 and out["fail"] == 1 and out["returncode"] == 1
+    assert not asked[0][3].exists(), "빈 스테이징 폴더는 정리한다"

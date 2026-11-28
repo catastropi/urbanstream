@@ -6,12 +6,13 @@
 #   scripts/recovery_drill.sh status          파이프라인 상태 한눈에 (ops.v_pipeline_health, 최근 알림)
 #   scripts/recovery_drill.sh webhook-test    웹훅이 실제로 닿는지 1건 보내기 (info → 아침 요약이 아니라 즉시 보내려고 error 로)
 #   scripts/recovery_drill.sh bad-key         잘못된 API 키로 서울 돌발 소스를 1회 호출 → 소스 down 알림 (수집기를 먼저 멈출 것)
-#   scripts/recovery_drill.sh kafka-down      kafka 컨테이너 중지 → 감시가 3분 안에 critical, 수집은 발행 실패를 audit 에 남김
-#   scripts/recovery_drill.sh kafka-up        kafka 컨테이너 시작 → 회복 알림
-#   scripts/recovery_drill.sh spark-down      spark-silver 중지 → 레이어 정체 알림(약 15~20분 뒤)
-#   scripts/recovery_drill.sh spark-up        spark-silver 시작 → 회복 알림
-#   scripts/recovery_drill.sh monitor-down    monitor 중지 → (알림 없음. 컨테이너 unhealthy/정지는 docker ps 로만 보인다 — D-126)
-#   scripts/recovery_drill.sh monitor-up      monitor 시작
+#   아래 6개는 STEP 3B 에서 scripts/drill.py 로 옮겼다(실행 전 검사·측정 잠금·최대 시간·자동 되돌리기·기록). 이름은 런북 링크 때문에 남긴다.
+#   scripts/recovery_drill.sh kafka-down      = python scripts/drill.py run kafka-stop        (수집 공백이 생긴다. 시기는 docs/runbooks/recovery.md)
+#   scripts/recovery_drill.sh kafka-up        = python scripts/drill.py restore kafka-stop
+#   scripts/recovery_drill.sh spark-down      = python scripts/drill.py run spark-silver-stop
+#   scripts/recovery_drill.sh spark-up        = python scripts/drill.py restore spark-silver-stop
+#   scripts/recovery_drill.sh monitor-down    = python scripts/drill.py run monitor-stop      (이제 host_watch 가 알린다, D-126)
+#   scripts/recovery_drill.sh monitor-up      = python scripts/drill.py restore monitor-stop
 #   잠자기 훈련은 자동화하지 않는다: docs/runbooks/step8-recovery.md 의 "7. 잠자기" 를 따라 직접 덮개를 닫는다.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -53,11 +54,11 @@ PY
     echo "→ 1~2분 뒤 'scripts/recovery_drill.sh status' 에서 seoul_incident 가 down(permanent_failure) 이고 웹훅에 [ERROR] 가 와야 합니다."
     echo "→ 수집기를 다시 켜면 다음 정상 호출 뒤 '해소' 알림이 와야 합니다."
     ;;
-  kafka-down)  docker stop urbanstream-kafka; echo "→ 약 3분 안에 [CRITICAL] 'Kafka 감사 토픽을 읽지 못합니다'. 끝나면: scripts/recovery_drill.sh kafka-up" ;;
-  kafka-up)    docker start urbanstream-kafka; echo "→ 1~2분 안에 'Kafka 감사 토픽 읽기 회복' 이 와야 합니다." ;;
-  spark-down)  docker stop urbanstream-spark-silver; echo "→ 약 15~20분 뒤 '…적재 정체' [ERROR] (원천 소스가 정상일 때만). 끝나면: scripts/recovery_drill.sh spark-up" ;;
-  spark-up)    docker start urbanstream-spark-silver; echo "→ 새 파일이 쌓이면 해소 알림." ;;
-  monitor-down) docker stop urbanstream-monitor; echo "→ 알림이 오지 않는 것이 정상입니다(감시자가 멈췄으므로). 이 한계는 docs/DEFERRED.md D-126 에 있습니다." ;;
-  monitor-up)  docker start urbanstream-monitor ;;
+  kafka-down)   exec "$PY" scripts/drill.py run kafka-stop ;;
+  kafka-up)     exec "$PY" scripts/drill.py restore kafka-stop ;;
+  spark-down)   exec "$PY" scripts/drill.py run spark-silver-stop ;;
+  spark-up)     exec "$PY" scripts/drill.py restore spark-silver-stop ;;
+  monitor-down) exec "$PY" scripts/drill.py run monitor-stop ;;
+  monitor-up)   exec "$PY" scripts/drill.py restore monitor-stop ;;
   *) sed -n 2,16p "$0" ;;
 esac

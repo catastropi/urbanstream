@@ -136,3 +136,26 @@ def test_prune_removes_old_monitor_rows_as_gold_writer_and_keeps_open_alerts(pg)
         pg.execute("RESET ROLE")
     assert (out["call_event"], out["source_health"], out["alert_event"], out["data_gap"], out["alert_state"]) == (1, 1, 1, 1, 1)
     assert pg.execute("SELECT dedup_key FROM ops.alert_state").fetchall() == [("open",)]        # 열린 알림 상태는 오래돼도 남는다
+
+
+def test_webhook_5xx_is_recorded_failed_and_carried_into_the_next_success(pg):
+    """R13 (STEP 3B): 웹훅이 5xx 를 주면 예외 없이 status='failed' 로 남고, 다음 전송이 성공할 때 '이전 전달 실패 N건' 이 붙는다.
+    (알림 경로가 끊긴 동안 알림이 사라지지 않았다는 것을 사람이 알 수 있게 한다.) 웹훅 주소는 본문에도 남지 않는다."""
+    calls: list[str] = []
+    ok = {"v": False}
+
+    def post(kind, url, text, **kw):
+        calls.append(text)
+        return SendResult(True, 204, "") if ok["v"] else SendResult(False, 503, f"503 from {URL}")
+
+    n = Notifier(store_of(pg), from_mapping(None), enabled=True, kind="discord", url=URL, clock=Clk(), post=post)
+    n.emit("error", "끊긴 동안 1", "", "r13:a")
+    n.emit("error", "끊긴 동안 2", "", "r13:b")
+    rows = pg.execute("SELECT status, reason FROM ops.alert_event WHERE dedup_key LIKE 'r13:%' ORDER BY alert_id").fetchall()
+    assert [r[0] for r in rows] == ["failed", "failed"]
+    assert all("abcdefghij" not in (r[1] or "") for r in rows), "실패 사유에 웹훅 주소가 남으면 안 된다"
+    ok["v"] = True
+    n.emit("error", "다시 연결됨", "", "r13:c")
+    assert "이전 전달 실패 2건" in calls[-1]
+    n.emit("error", "그다음", "", "r13:d")
+    assert "이전 전달 실패" not in calls[-1], "한 번 알린 실패는 다시 세지 않는다"

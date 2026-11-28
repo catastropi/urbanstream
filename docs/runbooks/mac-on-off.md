@@ -166,7 +166,7 @@ python -m collector status
 
 컨테이너가 안 될 때의 예전 방법: `caffeinate -i python -m collector run` (컨테이너를 먼저 멈춘다).
 
-### 2-D. 측정 표본 수집기 (STEP 2 동안)
+### 2-D. 측정 표본 수집기 (STEP 2 동안)와 호스트 감시 (STEP 3B 부터)
 
 Mac 을 재시작했거나 로그아웃했으면 다시 켠다(이미 돌고 있으면 그렇다고 알려 주고 끝난다).
 
@@ -178,7 +178,18 @@ python scripts/measure_sample.py --start
 python scripts/measure_sample.py --status
 ```
 
+호스트 감시(`host_watch`)는 Docker Desktop 이나 monitor 가 멈춰도 Discord 알림이 오게 하는 감시자다. 이것도 저절로 켜지지 않는다.
+
+```zsh
+python scripts/host_watch.py --start
+```
+
+```zsh
+python scripts/host_watch.py --status
+```
+
 ## 3. 켠 뒤 알아둘 것
+- **STEP 3B 부터: 켠 뒤 무엇이 문제인지 모르겠으면 `python scripts/recover.py diagnose`** (읽기만 한다. 문제마다 다음에 칠 명령을 보여 준다). 2-A 의 켜는 순서를 한 번에 하려면 `python scripts/recover.py resume`. 증상별 표는 `docs/runbooks/recovery.md`.
 - **Airflow 는 꺼진 동안 못 돈 실행을 따라잡지 않는다.** 모든 DAG 가 `catchup=False` — 꺼져 있던 시간대의 Gold·마트는 비어 있다. 필요하면 `backfill` DAG 로 수동 보충(HANDOFF 7장).
 - **켠 직후 몇 분은 Discord 에 적재 정체·소스 down 알림이 올 수 있다.** 보통 곧 "해소" 가 따라온다. 20~30분 지나도 해소가 안 오면 `scripts/stack.sh logs spark-bronze` 등으로 본다.
 - DAG 일시정지 상태는 Airflow DB(볼륨)에 남는다 [추정]. Airflow UI(http://127.0.0.1:8080)에서 DAG 가 켜져 있는지 한 번 본다.

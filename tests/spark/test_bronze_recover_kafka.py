@@ -5,13 +5,13 @@
 확인: (1) 재시작이 성공한다 (2) 복구 전에 쓴 Bronze 행이 계속 읽힌다 (3) 새 행이 이어서 쓰인다 (4) 같은 offset 이 두 번 쓰이지 않는다.
 대조: 체크포인트만 지우는 옛 방법은 새 batch 가 sink 기록에 막혀 쓰이지 않는다(조용한 유실)는 것도 같은 Kafka 로 보인다.
 
-실행 조건: URBANSTREAM_TEST_KAFKA_BOOTSTRAP(예: kafka:19092, localhost:9092)와 Spark Kafka 커넥터. 토픽을 새로 만들고 지운다.
-운영 Kafka 의 토픽은 건드리지 않는다(이름이 test.recover. 로 시작하는 토픽만 쓴다).
+실행 조건: Spark Kafka 커넥터와 실제 Kafka. URBANSTREAM_TEST_KAFKA_BOOTSTRAP(예: kafka:19092) 이 있으면 그 브로커를,
+없고 URBANSTREAM_TEST_KAFKA_HOME 이 있으면 시험 전용 브로커를 띄워 쓴다 (conftest.kafka_bootstrap, STEP 3B).
+토픽을 새로 만들고 지운다. 운영 Kafka 의 토픽은 건드리지 않는다(이름이 test.recover. 로 시작하는 토픽만 쓴다).
 """
 from __future__ import annotations
 
 import importlib.util
-import os
 import sys
 import time
 import uuid
@@ -20,8 +20,7 @@ from pathlib import Path
 
 import pytest
 
-BOOTSTRAP = os.environ.get("URBANSTREAM_TEST_KAFKA_BOOTSTRAP")
-pytestmark = pytest.mark.skipif(not BOOTSTRAP, reason="URBANSTREAM_TEST_KAFKA_BOOTSTRAP 가 없다 (실제 Kafka 가 필요한 시험)")
+BOOTSTRAP = ""                                 # topic fixture 가 conftest.kafka_bootstrap 값으로 채운다
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -35,7 +34,9 @@ def _recover_mod():
 
 
 @pytest.fixture
-def topic():
+def topic(kafka_bootstrap):
+    global BOOTSTRAP
+    BOOTSTRAP = kafka_bootstrap
     ck = pytest.importorskip("confluent_kafka")
     from confluent_kafka.admin import AdminClient, NewTopic
     admin = AdminClient({"bootstrap.servers": BOOTSTRAP})
@@ -152,3 +153,38 @@ def test_moving_only_the_checkpoint_silently_drops_new_batches(spark, tmp_path, 
     q = run_bronze(spark, table, cfg2)
     assert q.exception() is None
     assert len(offsets(spark, out)) == n1, "새 batch 가 '이미 쓴 batch' 로 처리돼 하나도 보이지 않는다"
+
+
+def test_recover_cli_status_preview_apply_on_a_real_checkpoint(spark, tmp_path, topic, capsys):
+    """R1 (STEP 3B): 명령 단위. status 가 '지워진 구간' 을 찾고(rc 1), 미리보기는 아무것도 바꾸지 않고,
+    --apply 가 고친 뒤 status 가 정상(rc 0)이 되고, 재시작한 Bronze 가 이어서 쓴다. recover.py bronze 가 부르는 것과 같은 명령이다."""
+    from streaming.bronze import BronzeConfig, BronzeTable
+    name, admin, ck = topic
+    rec = _recover_mod()
+    table = BronzeTable("bus_position", name, None)            # 표 이름은 config 의 실제 이름이어야 CLI 가 받는다
+    cfg = replace(BronzeConfig(), bootstrap=BOOTSTRAP, bronze_root=str(tmp_path / "bronze"),
+                  checkpoint_root=str(tmp_path / "ckpt"), max_offsets_per_trigger=None)
+    out = f"{cfg.bronze_root}/{table.name}"
+    produce(ck, name, 20, 0)
+    assert run_bronze(spark, table, cfg).exception() is None
+    before = offsets(spark, out)
+    produce(ck, name, 10, 100)
+    expire_everything(admin, name, ck, rec.kafka_watermarks(BOOTSTRAP))
+    args = ["--checkpoint-root", cfg.checkpoint_root, "--bootstrap", BOOTSTRAP, "--backup-root", str(tmp_path / "bak")]
+
+    assert rec.main(["status", "bus_position", *args]) == 1
+    assert "지워진 구간" in capsys.readouterr().out
+    ckpt = Path(cfg.checkpoint_root) / "bus_position" / "offsets"
+    snap = {p.name: p.read_bytes() for p in ckpt.iterdir()}
+    assert rec.main(["reset", "bus_position", *args]) == 0
+    assert "미리보기였다" in capsys.readouterr().out
+    assert {p.name: p.read_bytes() for p in ckpt.iterdir()} == snap, "미리보기는 체크포인트를 바꾸면 안 된다"
+
+    assert rec.main(["reset", "bus_position", "--apply", *args]) == 0
+    assert "적용함" in capsys.readouterr().out
+    assert rec.main(["status", "bus_position", *args]) == 0
+    produce(ck, name, 10, 200)
+    assert run_bronze(spark, table, cfg).exception() is None
+    after = offsets(spark, out)
+    assert set(before) <= set(after) and len(after) == len(set(after))
+    assert len(after) - len(before) >= 10

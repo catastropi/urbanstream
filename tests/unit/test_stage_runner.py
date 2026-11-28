@@ -705,3 +705,66 @@ def test_measure_runs_niced_with_its_own_timeout(tmp_path):
     R.process_pending(tmp_path, launcher=launcher(polls=10_000), env={**env, "GOLD_RUNNER_MEASURE_TIMEOUT_SEC": "250"},
                       clock=lambda: next(t), sleep=lambda s: None, kill=killed.append)
     assert killed and "250초" in (R.requests_dir(tmp_path) / "measure-9.failed").read_text()
+
+
+# ------------------------------------------------------------------ STEP 3B: silver_verify 를 실행기에서
+
+def _put_verify(base: Path, rid: str, args: dict) -> Path:
+    req = R.requests_dir(base)
+    req.mkdir(parents=True, exist_ok=True)
+    R.write_json_atomic(req / f"{rid}.json", {"id": rid, "key": f"silver_verify:{rid}", "date_from": "2026-11-25", "date_to": "2026-11-25",
+                                              "stage_dir": str(base / f"silver_reconcile_daily__{rid}__try1"), "created_at": time.time(),
+                                              "kind": "silver_verify", "args": args})
+    return req
+
+
+def test_silver_verify_runs_the_verify_script_with_production_read_paths(tmp_path):
+    calls = []
+
+    def run(cmd, env, stdout=None, stderr=None, **kw):
+        calls.append((cmd, env))
+        return Proc(0, "silver_traffic_speed OK\n", stdout=stdout, stderr=stderr)
+    req = _put_verify(tmp_path, "v1", {"lookback_days": "1"})
+    env = {"GOLD_BRONZE_ROOT": "/data/bronze", "GOLD_SILVER_ROOT": "/data/silver", "GOLD_SILVER_REBUILD_ROOT": "/data/silver_rebuild",
+           "SILVER_VERIFY_SINCE": "2026-01-01"}
+    assert R.process_pending(tmp_path, launcher=run, env=env) == [("v1", "done")]
+    cmd, e = calls[0]
+    assert cmd[0].endswith("spark-submit") and cmd[-1].endswith("streaming/silver_verify.py")
+    assert e["SILVER_BRONZE_ROOT"] == "/data/bronze" and e["SILVER_ROOT"] == "/data/silver"
+    assert e["SILVER_REBUILD_ROOT"] == "/data/silver_rebuild"
+    assert e["SILVER_VERIFY_LOOKBACK_DAYS"] == "1" and "SILVER_VERIFY_SINCE" not in e, "운영 대조는 최근 1일 구간만 (D-258)"
+    assert "nice" not in cmd
+    assert (req / "v1.out").read_text() == "silver_traffic_speed OK\n"
+
+
+def test_silver_verify_failed_comparison_is_done_but_crash_is_failed(tmp_path):
+    out = []
+    for rid, rc in (("v1", 1), ("v2", 2)):
+        _put_verify(tmp_path, rid, {})
+        out += R.process_pending(tmp_path, launcher=launcher(rc, "silver_weather FAIL 유실 2\n"), env={})
+    assert out == [("v1", "done"), ("v2", "failed")]
+    body = json.loads(R.marker(R.requests_dir(tmp_path), "v1", "done").read_text())
+    assert body["returncode"] == 1, "대조 실패는 실행기에게는 '끝남'이다. 결과 판정은 Airflow(dq_jobs)가 한다"
+
+
+def test_silver_verify_with_a_bad_lookback_is_refused_without_spark(tmp_path):
+    calls = []
+    _put_verify(tmp_path, "v1", {"lookback_days": "하루"})
+    assert R.process_pending(tmp_path, launcher=fake_spark(calls), env={}) == [("v1", "failed")]
+    assert calls == []
+
+
+def test_silver_verify_is_not_reattached_and_returns_its_request_id(tmp_path):
+    base = tmp_path
+    R.requests_dir(base).mkdir(parents=True)
+    R.touch_alive(R.requests_dir(base))
+    sd = J.stage_dir_for(base, "silver_reconcile_daily", "2026-11-25", 1)
+    seen = []
+
+    def tick(_):
+        body = json.loads(next(R.requests_dir(base).glob("*.json")).read_text())
+        seen.append(body)
+        R.write_json_atomic(R.marker(R.requests_dir(base), body["id"], "done"), {"returncode": 1, "elapsed_sec": 1})
+    res = J.request_runner("silver_verify", D, D, sd, args={"lookback_days": "1"}, base=base, sleep=tick, poll_sec=0)
+    assert seen[0]["kind"] == "silver_verify" and seen[0]["key"].startswith("silver_verify:")
+    assert res["_id"] == seen[0]["id"] and res["returncode"] == 1

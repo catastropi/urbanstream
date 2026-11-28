@@ -1,0 +1,47 @@
+# STEP 3B 복구·감시·훈련 설정. 도구: scripts/recover.py, scripts/host_watch.py, scripts/drill.py. 사용법: docs/runbooks/recovery.md
+# 결정 근거: docs/adr/0017-step3b-recovery.md. 값을 바꾸면 docs/recovery-drills.md 의 기대 결과도 같이 본다.
+version: 1
+
+# 우리 코드가 PID 1 로 도는 서비스. 컨테이너를 다시 만들어야 init: true 가 들어간다 (D-289, docker-compose.yml 머리말)
+init_services: [spark-bronze, spark-silver, gold-runner, monitor, collector, api, dashboard]
+
+# resume 이 켜는 순서 (mac-on-off.md 2-A). 수집기는 마지막에 따로
+resume:
+  first_profiles: "core,streaming,silver,airflow,monitor,api,dashboard"
+  collector_profiles: "core,collector"
+  healthy_wait_sec: 300
+
+# 호스트 감시 (설계안 6-2). 1분마다. Docker·monitor 가 멈춰도 돈다. Mac 이 잠들면 같이 멈춘다
+host_watch:
+  interval_sec: 60
+  docker_timeout_sec: 10
+  docker_fail_limit: 3                  # docker version 이 이만큼 연속 실패하면 critical
+  container_bad_sec: 300                # 꺼짐·unhealthy 가 이만큼 이어지면 error
+  monitor_stale_sec: 600                # ops.monitor_state 박동이 이만큼 오래되면 error
+  clock_every_sec: 300                  # 시계 비교 간격
+  clock_warn_sec: 60
+  clock_error_sec: 600
+  airflow_services: [airflow-scheduler, airflow-dag-processor]
+  airflow_mem_ratio: 0.9                # 메모리 한도의 이 비율을
+  airflow_pids: 300                     # 또는 프로세스 수를
+  airflow_sustain_sec: 300              # 이만큼 넘게 넘으면 warning (11-23 폭주 때 PIDS 659·433)
+  wake_grace_sec: 600                   # 깨어난 직후 이만큼은 컨테이너 상태 알림을 미룬다
+  wake_gap_sec: 90                      # 벽시계가 단조 시계보다 이만큼 더 흐르면 잠들었다 깬 것으로 본다
+
+# 진단 (recover.py diagnose)
+diagnose:
+  check_timeout_sec: 10
+  lock_old_sec: 1800                    # 이보다 오래 잡힌 작업 잠금을 보여 준다
+  runner_stale_sec: 180                 # gold-runner 박동 (batch/jobs.py RUNNER_STALE_SEC 와 같게)
+
+# 수동 훈련 (설계안 7-4). max_min = 이만큼 지나면 자동으로 되돌린다. gap = 수집 공백이 생기는가
+drills:
+  monitor-stop:      {max_min: 15, gap: false, scenario: R12}
+  spark-silver-stop: {max_min: 25, gap: false, scenario: R3}
+  spark-bronze-kill: {max_min: 10, gap: false, scenario: R2}
+  kafka-stop:        {max_min: 10, gap: true,  scenario: R4}
+  docker-restart:    {max_min: 20, gap: true,  scenario: R6}
+  recover-rehearsal: {max_min: 15, gap: false, scenario: R1}
+  settle_healthy_sec: 300               # 되돌린 뒤 모두 healthy 가 이만큼 이어져야 끝
+  settle_max_sec: 900
+  gap_budget_min: 60                    # 하루 수집 공백 합계 상한 (넘으면 그날 남은 훈련은 하지 않는다)

@@ -11,6 +11,12 @@ import pytest
 from batch import jobs as J
 from batch import stage_runner as R
 
+@pytest.fixture(autouse=True)
+def _no_job_lock(monkeypatch):
+    """작업 잠금(PostgreSQL)은 tests/integration/test_job_lock_pg.py 가 본다. 여기서는 DB 없이 흐름만 본다."""
+    monkeypatch.setattr(J, "job_lock", J.no_lock)
+
+
 D = date(2026, 11, 23)
 MID = J.kst_midnight_epoch(date(2026, 11, 22))       # 증분이 보는 첫 날(전날) 0시
 

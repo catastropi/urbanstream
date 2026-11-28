@@ -9,6 +9,12 @@ from urbanstream.notify import Notifier
 from urbanstream.notify.policy import from_mapping
 from urbanstream.notify.store import MemoryStore
 
+@pytest.fixture(autouse=True)
+def _no_job_lock(monkeypatch):
+    """작업 잠금(PostgreSQL)은 tests/integration/test_job_lock_pg.py 가 본다. 여기서는 DB 없이 흐름만 본다."""
+    monkeypatch.setattr(J, "job_lock", J.no_lock)
+
+
 
 class TI:
     dag_id, task_id, try_number, run_id = "gold_daily", "load", 2, "scheduled__x"

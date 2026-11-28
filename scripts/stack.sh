@@ -150,6 +150,8 @@ case "$cmd" in
     need_docker
     "$PY" scripts/stack_check.py
     "$PY" scripts/create_topics.py --check
+    # STEP 3B: 호스트 감시가 꺼져 있으면 Docker 가 멈췄을 때 알림이 없다. 경고만 하고 check 결과는 바꾸지 않는다
+    "$PY" scripts/host_watch.py --status || echo "(주의) 호스트 감시가 돌고 있지 않다. 켜기: python scripts/host_watch.py --start"
     ;;
   stats)
     need_docker

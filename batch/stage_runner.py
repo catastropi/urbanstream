@@ -15,6 +15,9 @@
                    GOLD_MEASURE_ROOT(/data/measure) 아래, 읽는 경로는 그 아래이거나 운영 읽기 전용 루트(/data/bronze·silver·silver_rebuild)여야 한다.
                    stage_dir 도 /data/measure 아래다. 운영 포인터를 게시하지 않는다(silver_point 는 측정 폴더 안의 포인터만 바꾼다).
                    nice GOLD_RUNNER_MEASURE_NICE(기본 10), 시간 한도 GOLD_RUNNER_MEASURE_TIMEOUT_SEC(기본 1200초).
+                   kind=silver_verify (STEP 3B): silver_reconcile_daily 의 Bronze·Silver 대조(streaming/silver_verify.py). 예전에는 Airflow
+                   scheduler 안에서 Spark 를 띄웠다(scheduler 안의 마지막 Spark). 읽기만 한다. args.lookback_days(기본 "1").
+                   대조 실패(종료 코드 1)도 실행이 끝난 것이라 .done 이다(returncode 로 구별). 표별 줄은 .out 에 있다.
                    실행 중 컨테이너 cgroup 메모리(memory.current)를 poll 마다 읽어 최댓값을 .done 의 mem_max_bytes 에 남긴다.
   <id>.running     실행 중 (실행기가 만든다)
   <id>.done        성공. {"returncode": 0, "elapsed_sec", "stdout_tail"}
@@ -63,7 +66,8 @@ DEFAULT_MAX_QUEUE_SEC = 3600
 DEFAULT_POLL_SEC = 5.0
 KILL_GRACE_SEC = 15.0
 KEEP_HOURS = 72.0
-KINDS = ("gold_stage", "silver_rebuild", "silver_publish", "measure")
+KINDS = ("gold_stage", "silver_rebuild", "silver_publish", "measure", "silver_verify")
+VERIFY_OK_RC = (0, 1)                 # silver_verify: 0 = 모두 OK, 1 = 대조 실패(결과는 Airflow 가 DQ 표에 남긴다)
 # STEP 2 측정 (kind=measure). 값 = (Spark 로 돌리는가, 성공으로 보는 종료 코드)
 MEASURE_JOBS: dict[str, tuple[bool, tuple[int, ...]]] = {
     "silver_build": (True, (0,)),      # batch/silver_rebuild.py build: 입력 Bronze → 측정 폴더의 Silver 버전
@@ -182,6 +186,19 @@ def measure_env(a: dict, e: dict, r: "Request") -> dict:
     return out
 
 
+def verify_env(r: "Request", e: dict) -> dict:
+    """kind=silver_verify 의 환경. 운영 읽기 경로(GOLD_*)를 silver_verify 가 읽는 SILVER_* 로 옮기고 비교 구간을 정한다."""
+    out = dict(e)
+    out["SILVER_BRONZE_ROOT"] = e.get("GOLD_BRONZE_ROOT", "/data/bronze")
+    out["SILVER_ROOT"] = e.get("GOLD_SILVER_ROOT", "/data/silver")
+    out["SILVER_REBUILD_ROOT"] = e.get("GOLD_SILVER_REBUILD_ROOT", "/data/silver_rebuild")
+    days = str((r.args or {}).get("lookback_days") or "1")
+    float(days)                                                    # 숫자가 아니면 ValueError → 요청 실패
+    out["SILVER_VERIFY_LOOKBACK_DAYS"] = days
+    out.pop("SILVER_VERIFY_SINCE", None)
+    return out
+
+
 def pending(req_dir: Path) -> list[Request]:
     """끝나지 않은 요청을 만든 순서대로. 실행 중 표시(.running)가 남은 것도 포함한다: 실행기가 죽었다 다시 뜬 경우라 다시 실행한다."""
     if not req_dir.is_dir():
@@ -238,6 +255,8 @@ def spark_command(r: Request, *, driver_memory: str, master: str, spark_submit: 
         if job == "silver_verify":
             return head + [str(here.parent / "streaming" / "silver_verify.py")]
         raise ValueError(f"측정 작업 {job} 는 Spark 명령이 없습니다")
+    if r.kind == "silver_verify":
+        return head + [str(here.parent / "streaming" / "silver_verify.py")]
     if r.kind != "gold_stage":
         raise ValueError(f"{r.kind} 는 Spark 명령이 없습니다")
     return head + [str(here / "gold_stage.py"), "--from", r.date_from, "--to", r.date_to, *files_args(r.files_since, r.files_until)]
@@ -362,6 +381,14 @@ def run_one(r: Request, req_dir: Path, stage_base: Path, *, launcher: Callable[.
     if measure_args is not None:
         ok_rc = MEASURE_JOBS[measure_args["job"]][1]
         e = measure_env(measure_args, e, r)
+    if r.kind == "silver_verify":
+        ok_rc = VERIFY_OK_RC
+        try:
+            e = verify_env(r, e)
+        except ValueError as ex:
+            write_json_atomic(marker(req_dir, r.id, "failed"), {"returncode": None, "stderr_tail": f"요청 인자 오류: {ex}"})
+            marker(req_dir, r.id, "running").unlink(missing_ok=True)
+            return "failed"
     if measure_args is not None and not MEASURE_JOBS[measure_args["job"]][0]:   # Spark 없는 측정 작업 (silver_point)
         try:
             out_p.write_text(json.dumps(run_measure_point(r, measure_args), ensure_ascii=False), encoding="utf-8")

@@ -575,3 +575,14 @@ def test_every_documented_profile_set_includes_the_services_it_depends_on():
                 if dep not in active:
                     bad.append(f"{where}: {sorted(profiles)} 의 {n} → {dep}")
     assert not bad, bad
+
+
+def test_kafka_healthcheck_timeout_wraps_the_jvm_itself():
+    """R5 (STEP 3B, D-281): 검사 JVM 을 timeout 이 직접 감싸야 시간 초과 때 JVM 이 남지 않는다
+    (Docker 의 healthcheck 시간 초과는 sh 만 끝낸다). timeout 값은 Docker 의 검사 시간 한도보다 짧아야 하고, 힙은 작게."""
+    hc = SERVICES["kafka"]["healthcheck"]
+    cmd = hc["test"][1]
+    m = re.search(r"\btimeout (\d+) (/opt/kafka/bin/kafka-[\w-]+\.sh)", cmd)
+    assert m, f"timeout 이 검사 스크립트를 바로 감싸지 않는다: {cmd}"
+    assert int(m.group(1)) < int(str(hc["timeout"]).rstrip("s"))
+    assert "-Xmx64m" in cmd and "&&" not in cmd and ";" not in cmd    # 다른 명령 뒤에 숨지 않는다

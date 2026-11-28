@@ -18,6 +18,8 @@
   - `0014-step12-azure-evidence-deploy.md` — Step 12 Azure 최소 증거 배포: VM 1대·NSG SSH 전용·compose 오버라이드·스냅샷 복원·터널·destroy (D12-1~12)
   - `0015-reprocess.md` — STEP 1 Bronze→Silver 재처리(별도 루트 + 날짜별 포인터)와 Gold 범위 교체(재처리 경로에서만, 한 트랜잭션)
   - `0016-step2-measure.md` — STEP 2 성능·규모 측정: M1~M8, 합성 데이터 분리(표시 네 곳·별도 DB·날짜), 실행 위치, 안전장치(실행 전 검사·금지 시간대·감시), 11-25 적용 중 고친 것
+  - `0017-step3b-recovery.md` — STEP 3B 복구 자동화와 장애 훈련: 시나리오 R1~R14, 결정 1~12, 설계안과 달라진 4곳, 작업 잠금, host_watch, 시험
+- `recovery-drills.md` — 장애 훈련과 실제 장애 기록 표 (`drill.py` 가 한 줄씩 붙인다)
 - `evidence/step12/` — Step 12 증거 이미지 19장(마스킹함)과 설명 `README.md` (Azure 배포·접속·비용·파괴).
 - `runbooks/` — 절차서.
   - `step0-closeout.md` — Step 0 마무리 측정·확인 (사용자가 Mac 에서 실행)
@@ -30,6 +32,7 @@
   - `step9-api.md` — API 기동·점검(curl)·오류 코드·테스트·키 교체 (사용자가 Mac 에서 실행)
   - `step10-dashboard.md` — 대시보드 기동·화면 확인·메모리·Tableau CSV 만들기와 게시 전 점검 (사용자가 Mac 에서 실행)
   - `mac-on-off.md` — Mac 에서 스택·수집기를 끄고 켜는 절차(`docker stop` / `docker compose start`, 지워졌을 때 `up-*`), 절전(덮개 닫힘) 주의 (사용자가 Mac 에서 실행, Step 12 전)
+  - `recovery.md` — 증상 → 칠 명령 (`recover.py diagnose`·`resume`·`bronze`·`clock`), DQ 차단 풀기, 작업 잠금, host_watch, 훈련 (사용자가 Mac 에서 실행)
   - `measure.md` — STEP 2 성능 측정: 5분 표본 수집기(`measure_sample.py --start`)·안전 검사·합성 데이터·무거운 측정(12-09 이후)·보고서·중단과 되돌리기 (사용자가 Mac 에서 실행)
   - `step11-ci.md` — 핀 만들기(gitleaks·액션 SHA)·commit/push·Actions 첫 실행 확인·릴리스 태그·되돌리기 (사용자가 Mac 에서 실행)
   - `step12-cloud.md` — Step 12 코드 완료 시점(11-12)의 실행 절차서(apply→up→터널→destroy). 실제 실행 결과 기반 절차는 `step12-azure.md`

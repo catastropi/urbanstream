@@ -53,6 +53,9 @@ scripts/recovery_drill.sh status
 `ops.v_pipeline_health`(소스·레이어·모니터·적재·마트 상태)와 최근 알림 10건. 처음 몇 분은 `unknown`(자료 없음)이 정상입니다 — Kafka 의 audit 를 읽어 오는 중입니다.
 
 ## 6. 복구 훈련 (👤 사용자 작업 — 일부러 고장 냅니다)
+> **STEP 3B 부터:** 아래 kafka/spark 명령은 `scripts/drill.py` 를 부릅니다(실행 전 검사·최대 시간·자동 되돌림·기록). 수집을 끊는 훈련은
+> STEP 2 무거운 측정이 끝난 뒤에만 합니다. 증상별 복구 명령과 훈련 전체는 `docs/runbooks/recovery.md`, 기록은 `docs/recovery-drills.md`.
+
 각각 "고장 → 알림 도착 → 고침 → 해소 알림" 을 봅니다.
 ```zsh
 scripts/recovery_drill.sh kafka-down
@@ -75,6 +78,8 @@ scripts/recovery_drill.sh bad-key
 1~2분 뒤 `소스 seoul_incident down`. 수집기를 다시 켜면 해소 알림. (`.env` 의 실제 키는 쓰이지도 바뀌지도 않습니다.)
 
 ## 7. 잠자기 훈련 (👤 직접)
+> 깨어난 뒤 Docker 시계가 늦었는지는 `python scripts/recover.py clock` 으로 봅니다(STEP 3B, `recovery.md` 4절).
+
 1) `python scripts/sleep_probe.py` 를 켜 두고 덮개를 1~2분 닫았다 엽니다. '잠잔 시간' 이 닫은 시간과 비슷하면 D-120 의 전제가 맞습니다 — 결과를 알려 주세요.
 2) 수집기·monitor·Airflow 를 켠 채 덮개를 20분 이상 닫았다 엽니다. 열고 약 2분 뒤 `status` 에서 `ops.data_gap` 에 `host_stall` 이 기록되고, 그 사이 실패한 DAG 알림이 `[WARN]`(아침 요약)으로 내려가 있어야 합니다. 확인:
 ```zsh

@@ -144,9 +144,23 @@ def test_weekly_schedule_and_full_history_scan():
     doc = load("weekly.yml")
     t = triggers(doc)
     assert "schedule" in t and "workflow_dispatch" in t
-    assert set(doc["jobs"]) == {"secrets-full", "python-matrix", "spark", "mutation-api-full", "dags"}
+    assert set(doc["jobs"]) == {"secrets-full", "python-matrix", "spark", "recovery-kafka", "mutation-api-full", "dags"}
     text = (WF / "weekly.yml").read_text(encoding="utf-8")
     assert "--mode full" in text and "fetch-depth: 0" in text
+
+
+def test_weekly_recovery_kafka_checks_the_download_and_runs_the_crash_tests():
+    """STEP 3B: 내려받은 Kafka 배포판은 sha512 로 확인한 뒤에만 푼다. 운영과 같은 버전(3.9.2)."""
+    job = load("weekly.yml")["jobs"]["recovery-kafka"]
+    runs = [s.get("run", "") for s in job["steps"]]
+    dl = next(r for r in runs if "kafka.tgz" in r)
+    assert dl.index("sha512sum -c") < dl.index("tar xzf")
+    assert job["env"]["KAFKA_VERSION"] == "3.9.2" and len(job["env"]["KAFKA_SHA512"]) == 128
+    compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    assert "apache/kafka:3.9.2" in compose, "운영 Kafka 버전이 바뀌면 시험 브로커 버전도 같이 바꾼다"
+    joined = "\n".join(runs)
+    for f in ("test_bronze_recover_kafka.py", "test_crash_restart_kafka.py", "test_silver_restart.py", "test_publisher_kafka.py"):
+        assert f in joined
 
 
 def test_workflow_script_references_exist():

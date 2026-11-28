@@ -1,7 +1,7 @@
 """Bronze 쓰기 테스트: 파일 sink + 체크포인트. Kafka 없이 `rate` 소스를 Kafka 열 모양으로 바꿔서 같은 쓰기 코드를 돌린다.
 
 여기서 확인하는 것: 폴더 구조(event_date 분할), 체크포인트 재시작 때 중복·유실 없음, 읽기 설정.
-확인하지 못하는 것(= 실제 Kafka 가 필요한 것): 배치 도중 프로세스가 죽는 경우 → docs/runbooks/step4-bronze.md 의 복구 시험.
+배치 도중 프로세스가 kill -9 로 죽는 경우와 브로커 재시작은 실제 Kafka 로 test_crash_restart_kafka.py 가 본다 (STEP 3B R2·R4).
 """
 from __future__ import annotations
 

@@ -16,8 +16,8 @@
   - 남은 offset 으로 옮기는 것은 지워진 구간을 잃었다는 사실을 바꾸지 않는다. 잃은 메시지 수를 출력하고, 바꾸기 전 파일은
     data/_recovery/<시각>/ 에 복사해 둔다.
 
-반드시 spark-bronze 를 멈춘 뒤 --apply 한다(실행 중이면 체크포인트를 쓰는 중일 수 있다). 스크립트는 멈췄는지 확인하지 못하므로
-`docker compose --profile streaming stop spark-bronze` 를 먼저 실행하라고 안내만 한다.
+반드시 spark-bronze 를 멈춘 뒤 --apply 한다(실행 중이면 체크포인트를 쓰는 중일 수 있다). 이 스크립트는 멈췄는지 확인하지 못한다.
+멈춤 → 확인 → 고침 → 시작 → 확인을 한 번에 하는 것은 `python scripts/recover.py bronze <표> --apply` 다(STEP 3B).
 """
 from __future__ import annotations
 
@@ -175,10 +175,9 @@ def main(argv: Optional[list[str]] = None, *, watermarks: Optional[Watermarks] =
                 apply_plan(p, backup)
             print(f"{'':<16} 적용함. 바꾸기 전 파일: {backup / t}")
     if a.cmd == "reset" and not a.apply and needs:
-        print("\n미리보기였다. spark-bronze 를 멈춘 뒤 --apply 를 붙여 실행한다:\n"
-              "  docker compose --profile streaming stop spark-bronze\n"
-              f"  python scripts/bronze_recover.py reset {' '.join(a.tables)} --apply\n"
-              "  scripts/stack.sh up-silver")
+        print("\n미리보기였다. 멈춤·고침·시작·확인을 한 번에 하려면:\n"
+              f"  python scripts/recover.py bronze {' '.join(a.tables)} --apply\n"
+              "손으로 하려면: docker stop urbanstream-spark-bronze → 이 명령에 --apply → docker start urbanstream-spark-bronze")
     if a.cmd == "status":
         return 1 if needs else 0
     return 0

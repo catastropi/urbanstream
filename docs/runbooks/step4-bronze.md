@@ -169,6 +169,9 @@ mkdir -p data/bronze data/checkpoints
 
 ## 8. ⚠ Mac 을 오래 꺼 뒀다 켰더니 `spark-bronze` 가 unhealthy 일 때 (`OffsetOutOfRange`)
 
+> **STEP 3B 부터 권하는 방법:** `python scripts/recover.py bronze` (미리보기) → `python scripts/recover.py bronze <표> --apply`.
+> 멈춤·확인·고침·시작·새 파일 확인을 한 번에 한다(`docs/runbooks/recovery.md` 3절). 아래는 원리와 손으로 하는 방법이다.
+
 **무슨 일인가.** Kafka 는 메시지를 7일 보관합니다(`config/topics.yaml`. 11-19 까지는 72시간이었다, D-256). 그보다 오래 꺼 두면 Bronze 체크포인트가 가리키는 offset 의 데이터가 이미 지워져 있고, 설계대로(`failOnDataLoss=true`, `streaming/bronze.py`) 쿼리가 유실을 숨기지 않고 **실패**합니다. 11-12 17:05 에 끄고 11-16 에 켰을 때 실제로 일어났습니다(DEFERRED D-255). 꺼 둔 동안은 수집기도 서 있었으므로 **그 구간의 데이터는 어디에도 없습니다.** 되살릴 것은 "앞으로"입니다.
 
 **확인.** 어느 표가 문제인지는 스크립트가 체크포인트와 Kafka 를 비교해 알려 준다(읽기만 한다).

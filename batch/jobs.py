@@ -20,7 +20,8 @@ import sys
 import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Callable, Iterable, Mapping, Optional, Sequence
+from contextlib import contextmanager
+from typing import Any, Callable, Iterable, Iterator, Mapping, Optional, Sequence
 from zoneinfo import ZoneInfo
 
 LOG = logging.getLogger("urbanstream.batch.jobs")
@@ -85,6 +86,105 @@ def parse_day(value: Any) -> date:
         return date.fromisoformat(str(value).strip())
     except ValueError as e:
         raise ValueError(f"날짜는 YYYY-MM-DD 형식이어야 합니다: {value!r}") from e
+
+
+# ------------------------------------------------------------------ 작업 잠금 (STEP 3B, D-212 재발 방지)
+
+LOCK_WAIT_SEC = 600          # 잠금을 못 잡으면 이만큼 기다린다(그 뒤 실패 + 알림)
+LOCK_POLL_SEC = 30
+LOCK_LABEL_PREFIX = "uslock:"
+LOCK_NAMESPACE = 3217        # pg_try_advisory_lock(int, int) 의 첫 번째 값. 다른 advisory lock(적재의 xact lock)과 섞이지 않게
+
+
+class LockBusy(JobError):
+    """같은 종류의 작업이 이미 돌고 있다(고아로 판정된 이전 시도 등)."""
+
+
+def lock_key(name: str) -> int:
+    """작업 이름 → 32비트 정수(두 번째 키). 파이썬 hash() 는 실행마다 달라서 쓰지 않는다."""
+    import zlib
+    return zlib.crc32(name.encode("utf-8")) & 0x7FFFFFFF
+
+
+def lock_label(name: str, env: Optional[Mapping[str, str]] = None) -> str:
+    """pg_stat_activity.application_name 에 남길 이름(63바이트에서 잘림). 'uslock:<작업>:<dag>#<시도>:pid<N>:<run_id>'.
+    누가 잠금을 잡았는지 diagnose 가 보여 준다. 잘리면 뒤쪽 run_id 부터 잘린다."""
+    e = os.environ if env is None else env
+    dag, run, tr = e.get("AIRFLOW_CTX_DAG_ID") or "manual", e.get("AIRFLOW_CTX_DAG_RUN_ID") or "", e.get("AIRFLOW_CTX_TRY_NUMBER") or "-"
+    return f"{LOCK_LABEL_PREFIX}{name}:{dag}#{tr}:pid{os.getpid()}:{run}"[:63]
+
+
+def _lock_connect(label: str):
+    import psycopg
+    from batch.db import conninfo
+    return psycopg.connect(conninfo(role="writer"), autocommit=True, application_name=label, connect_timeout=10)
+
+
+@contextmanager
+def job_lock(name: str, *, connect: Optional[Callable[[str], Any]] = None, wait_sec: float = LOCK_WAIT_SEC,
+             poll_sec: float = LOCK_POLL_SEC, sleep: Callable[[float], None] = time.sleep,
+             clock: Callable[[], float] = time.monotonic) -> Iterator[None]:
+    """같은 이름의 작업이 동시에 두 개 돌지 않게 한다. PostgreSQL **세션** advisory lock 이다.
+
+    - 작업이 끝나면 풀고, 프로세스가 죽어 접속이 끊기면 서버가 저절로 푼다(파일 잠금처럼 남은 찌꺼기를 지울 일이 없다).
+    - 못 잡으면 poll_sec 마다 다시 시도하고 wait_sec 가 지나면 LockBusy. 잡고 있는 쪽의 application_name·시작 시각을 메시지에 넣는다.
+    - 잠금 전용 접속을 따로 연다. 작업의 적재 접속이 끊겨도 잠금은 작업이 끝날 때까지 유지된다.
+    - connect(label) 는 시험용. 기본은 gold_loader(writer)로 붙는다.
+    """
+    conn = (connect or _lock_connect)(lock_label(name))
+    key = lock_key(name)
+    try:
+        t0 = clock()
+        while True:
+            got = conn.execute("SELECT pg_try_advisory_lock(%s, %s)", (LOCK_NAMESPACE, key)).fetchone()[0]
+            if got:
+                break
+            if clock() - t0 >= wait_sec:
+                holder = lock_holder(conn, name)
+                raise LockBusy(f"이전 시도가 아직 실행 중입니다 ({name}: {holder or '누가 잡았는지 모름'}). "
+                               f"{int(wait_sec)}초 기다렸지만 풀리지 않았습니다. 멈춘 시도라면 "
+                               f"`python scripts/recover.py diagnose` 가 잠금을 푸는 질의를 보여 줍니다")
+            LOG.info("작업 잠금 %s 대기 중 (%s)", name, lock_holder(conn, name) or "?")
+            sleep(poll_sec)
+        LOG.info("작업 잠금을 잡았습니다: %s", name)
+        try:
+            yield
+        finally:
+            try:
+                conn.execute("SELECT pg_advisory_unlock(%s, %s)", (LOCK_NAMESPACE, key))
+            except Exception:                                                # noqa: BLE001 (접속이 끊겼으면 서버가 이미 풀었다)
+                LOG.warning("작업 잠금 해제 실패(접속이 끊겼으면 이미 풀렸다): %s", name)
+    finally:
+        try:
+            conn.close()
+        except Exception:                                                    # noqa: BLE001
+            pass
+
+
+def lock_holder(conn: Any, name: str) -> Optional[str]:
+    """잠금을 잡은 접속의 'application_name (pid N, 시작 HH:MM)'. 못 읽으면 None."""
+    try:
+        r = conn.execute(
+            "SELECT a.application_name, a.pid, to_char(a.backend_start AT TIME ZONE 'Asia/Seoul', 'MM-DD HH24:MI') "
+            "FROM pg_locks l JOIN pg_stat_activity a ON a.pid = l.pid "
+            "WHERE l.locktype = 'advisory' AND l.granted AND l.classid = %s AND l.objid = %s AND l.objsubid = 2 LIMIT 1",
+            (LOCK_NAMESPACE, lock_key(name))).fetchone()
+    except Exception:                                                        # noqa: BLE001
+        return None
+    return f"{r[0]} (pid {r[1]}, 접속 {r[2]})" if r else None
+
+
+@contextmanager
+def no_lock(name: str, **_: Any) -> Iterator[None]:
+    """잠금 없이 (시험, 또는 DB 없이 손으로 돌릴 때)."""
+    yield
+
+
+LockFn = Callable[..., Any]
+LOCK_INCREMENTAL = "gold_facts_incremental"
+LOCK_WINDOW = "gold_window"
+LOCK_INLINE = "gold_stage_inline"
+LOCK_RECONCILE = "silver_reconcile"
 
 
 # ------------------------------------------------------------------ 스테이징 폴더
@@ -225,7 +325,7 @@ def request_runner(kind: str, d0: date, d1: date, stage_dir: Path, *, args: Opti
     Gold 요청과 supersede 되지 않게 한다.
 
     - gold_stage 는 같은 실행의 이전 시도가 남긴 요청이 아직 줄에 있거나 도는 중이면 새로 만들지 않고 그 결과를 기다린다(재연결).
-      silver_rebuild·silver_publish 는 결과 보고서를 자기 폴더에 쓰므로 재연결하지 않는다.
+      silver_rebuild·silver_publish·silver_verify 는 재연결하지 않는다(결과가 자기 요청 파일·폴더에 있다).
     - timeout_sec 는 줄 서기와 실행에 각각 적용한다: 실행이 시작되면(.running) 그때부터 다시 timeout_sec 를 센다.
     - 기다리는 동안 실행기 박동이 stale_sec 넘게 멈추면 실행기가 죽은 것이므로 바로 실패한다(실행기는 Spark 실행 중에도 박동한다).
     - 대기 한도는 clock(기본 time.monotonic)으로 센다: Mac 이 잠든 시간은 들어가지 않는다(11-23 01:00 gold_daily 는 계산 538초인데
@@ -276,6 +376,7 @@ def request_runner(kind: str, d0: date, d1: date, stage_dir: Path, *, args: Opti
                 if end == "done":
                     LOG.info("%s 완료 (%.1f초, 실행기)", kind, res.get("elapsed_sec") or 0)
                     res["_stage_dir"] = str(stage_dir)
+                    res["_id"] = rid
                     return res
                 if end == "superseded":
                     raise JobError(f"같은 구간의 더 새 요청이 있어 이 요청은 건너뛰었습니다: {res.get('by')}")
@@ -311,7 +412,8 @@ def request_stage(d0: date, d1: date, stage_dir: Path, **kw) -> dict:
 def run_stage_inline(d0: date, d1: date, stage_dir: Path, *, silver_root: Optional[str] = None, bronze_root: Optional[str] = None,
               driver_memory: Optional[str] = None, master: Optional[str] = None, timeout_sec: int = 1800,
               runner: Callable[..., Any] = subprocess.run, python: Optional[str] = None,
-              files_since: Optional[float] = None, files_until: Optional[float] = None) -> dict:
+              files_since: Optional[float] = None, files_until: Optional[float] = None,
+              lock: Optional[LockFn] = None) -> dict:
     """Silver·Bronze audit → stage_dir (Parquet + manifest.json). 비밀 없는 환경에서 `python -m batch.gold_stage` 를 이 프로세스의 자식으로 실행한다.
 
     GOLD_STAGE_MODE=inline 일 때 쓴다(예전 방식, CI·호스트 실행용). Airflow 컨테이너에서는 Spark 메모리가 scheduler 와 겹친다(D-211).
@@ -330,15 +432,23 @@ def run_stage_inline(d0: date, d1: date, stage_dir: Path, *, silver_root: Option
     started = time.monotonic()
     LOG.info("gold_stage 시작: %s ~ %s → %s", d0, d1, stage_dir)
     try:
-        proc = runner(cmd, cwd=str(ROOT), env=env, capture_output=True, text=True, timeout=timeout_sec)
+        with (lock or job_lock)(LOCK_INLINE):         # 되돌리기 모드에서도 Spark 가 이 컨테이너에 두 개 뜨지 않게 (STEP 3B)
+            proc = runner(cmd, cwd=str(ROOT), env=env, capture_output=True, text=True, timeout=timeout_sec)
     except subprocess.TimeoutExpired as e:
-        raise JobError(f"gold_stage 가 {timeout_sec}초 안에 끝나지 않았습니다") from e
+        raise JobError(f"gold_stage 가 {timeout_sec}초 안에 끝나지 않았습니다\n{_tail(_text(e.stderr), 40)}") from e
     if proc.returncode != 0:
         raise JobError(f"gold_stage 실패 (종료 코드 {proc.returncode})\n{_tail(proc.stderr, 60)}")
     if proc.stderr:
         LOG.info("gold_stage stderr 끝부분:\n%s", _tail(proc.stderr, 15))
     LOG.info("gold_stage 완료 (%.1f초)", time.monotonic() - started)
     return read_manifest(stage_dir)
+
+
+def _text(v: Any) -> str:
+    """TimeoutExpired.stderr 는 bytes 이거나 None 일 수 있다."""
+    if v is None:
+        return ""
+    return v.decode("utf-8", "replace") if isinstance(v, bytes) else str(v)
 
 
 def read_manifest(stage_dir: Path) -> dict:
@@ -445,8 +555,17 @@ def mark_stale_runs(*, older_than_minutes: int = 120, connect: Optional[Callable
 def process_window(d0: date, d1: date, *, dag_id: str, run_id: str, try_number: int = 1, refresh_mart: bool = False,
                    base: Optional[Path] = None, keep_on_failure: bool = True,
                    stage: Callable[..., dict] = run_stage, load: Callable[..., dict] = run_load,
-                   verify: Callable[..., Any] = verify_counts) -> dict:
-    """스테이징 → manifest 검사 → 적재 → 행 수 검증 → 폴더 정리. 백필의 하루 단위 태스크가 쓴다."""
+                   verify: Callable[..., Any] = verify_counts, lock: Optional[LockFn] = None) -> dict:
+    """스테이징 → manifest 검사 → 적재 → 행 수 검증 → 폴더 정리. 백필의 하루 단위 태스크가 쓴다.
+    작업 잠금(LOCK_WINDOW) 안에서 돈다: 고아로 판정된 이전 시도가 아직 돌면 기다리고, 10분 넘게 안 풀리면 실패한다."""
+    with (lock or job_lock)(LOCK_WINDOW):
+        return _process_window(d0, d1, dag_id=dag_id, run_id=run_id, try_number=try_number, refresh_mart=refresh_mart,
+                               base=base, stage=stage, load=load, verify=verify)
+
+
+def _process_window(d0: date, d1: date, *, dag_id: str, run_id: str, try_number: int, refresh_mart: bool,
+                    base: Optional[Path], stage: Callable[..., dict], load: Callable[..., dict],
+                    verify: Callable[..., Any]) -> dict:
     base = Path(base or stage_base())
     sd = stage_dir_for(base, dag_id, run_id, try_number)
     started = datetime.now(timezone.utc)
@@ -517,12 +636,27 @@ def process_incremental(d0: date, d1: date, *, dag_id: str, run_id: str, try_num
                         base: Optional[Path] = None, stage: Callable[..., dict] = run_stage, load: Callable[..., dict] = run_load,
                         verify: Callable[..., Any] = verify_counts, wall: Callable[[], float] = time.time,
                         mono: Callable[[], float] = time.monotonic, max_span_sec: Optional[float] = None,
-                        budget_sec: Optional[float] = None, refresh: Optional[Callable[[], None]] = None) -> dict:
+                        budget_sec: Optional[float] = None, refresh: Optional[Callable[[], None]] = None,
+                        lock: Optional[LockFn] = None) -> dict:
     """새로 생긴 Silver 파일만 스테이징·적재한다. 진행 기록(_state/gold_facts.json 의 until)이 없으면 시작일 0시부터.
 
     밀려 있으면(잠자기, 실패 뒤) 최대 max_span_sec 씩 나눠 여러 번 돌린다. 한 번 끝날 때마다 진행 기록을 앞으로 옮기므로
     태스크가 중간에 죽어도 다음 실행이 이어서 한다. budget_sec 를 넘으면 남은 것은 다음 실행에 맡긴다.
+
+    gold_intraday·gold_daily 가 같은 작업 잠금(LOCK_INCREMENTAL)을 쓴다. 진행 기록을 같이 쓰기 때문이다. 잠금을 기다린 뒤에는
+    진행 기록을 다시 읽으므로, 앞 시도가 이미 따라잡았으면 할 일이 없어 바로 끝난다.
     """
+    with (lock or job_lock)(LOCK_INCREMENTAL):
+        return _process_incremental(d0, d1, dag_id=dag_id, run_id=run_id, try_number=try_number, refresh_mart=refresh_mart,
+                                    base=base, stage=stage, load=load, verify=verify, wall=wall, mono=mono,
+                                    max_span_sec=max_span_sec, budget_sec=budget_sec, refresh=refresh)
+
+
+def _process_incremental(d0: date, d1: date, *, dag_id: str, run_id: str, try_number: int, refresh_mart: bool,
+                         base: Optional[Path], stage: Callable[..., dict], load: Callable[..., dict],
+                         verify: Callable[..., Any], wall: Callable[[], float], mono: Callable[[], float],
+                         max_span_sec: Optional[float], budget_sec: Optional[float],
+                         refresh: Optional[Callable[[], None]]) -> dict:
     base = Path(base or stage_base())
     w0, w1 = incremental_window(d0, d1)
     max_span = float(max_span_sec or os.environ.get("GOLD_INCR_MAX_SPAN_SEC") or INCR_MAX_SPAN_SEC)

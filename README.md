@@ -77,6 +77,8 @@ Azure에 올렸던 서빙 계층에서 캡처한 화면입니다(11-12 시점 �
 
 - **STEP 2 측정 도구를 Mac 에 적용하며 생긴 문제(D-289~D-291, 11-25).** 수집기 컨테이너가 좀비 프로세스 때문에 `docker stop` 으로 꺼지지 않아, 우리 코드가 PID 1 로 도는 서비스에 init 을 넣었습니다. launchd 로 등록한 5분 표본 수집기가 주기 실행되지 않아(원인 미확정) 수집기가 스스로 반복하게 바꿨습니다. 프로필 하나만 켠 `docker compose` 명령이 의존 서비스가 정의에 없다며 실패해, 문서와 도구의 명령을 고치고 문서에 적힌 모든 프로필 조합을 시험으로 검사합니다.
 
+- **Docker Desktop 이 멈추자 알림이 0건(11-24~25, D-126·D-297).** 알림을 보내는 monitor 도 Docker 안에 있어서 같이 멈췄습니다. Docker 밖(Mac 의 Python)에서 1분마다 Docker 응답·컨테이너 상태·monitor 박동·Docker 시계를 보고 웹훅으로 직접 보내는 `host_watch` 를 더했습니다. Mac 이 잠들거나 꺼진 경우는 여전히 알릴 수 없습니다. 증상마다 칠 명령을 하나로 모은 `scripts/recover.py diagnose`, 같은 Gold 작업이 겹쳐 돌지 않게 하는 DB 세션 잠금, 실제 Kafka 브로커를 죽였다 살리는 시험을 함께 넣었고, 일부러 고장 내는 훈련과 실제 장애를 `docs/recovery-drills.md` 한 표에 적습니다(STEP 3B, ADR-0017).
+
 ## Azure 배포
 
 서빙 계층(PostgreSQL, FastAPI, Streamlit)만 VM 1대에 올렸고, Kafka·Spark·Airflow·수집기는 올리지 않았습니다.
