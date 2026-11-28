@@ -6,7 +6,7 @@ import pytest
 
 import dashboard_support as D
 from dashboard import contract as C
-from dashboard.client import ApiClient, ApiError, FetchResponse
+from dashboard.client import ApiError, FetchResponse
 
 
 def resp(status, body=None, headers=None):

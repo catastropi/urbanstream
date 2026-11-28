@@ -107,7 +107,6 @@ def test_load_all_records_dag_id_and_keeps_job_name(pg, tmp_path):
     """009 의 dag_id 열: job='gold_load' 는 그대로여야 마트 선행조건(require_recent_load)이 계속 통과한다."""
     import json
     from batch import gold_load as GL
-    from batch import marts as M
     (tmp_path / "manifest.json").write_text(json.dumps({"date_from": "2026-11-04", "date_to": "2026-11-04"}))
     r1 = GL.load_all(pg, tmp_path, specs=(), dag_id="gold_intraday")
     r2 = GL.load_all(pg, tmp_path, specs=())                                  # 옛 호출 모양 (dag_id 없음)

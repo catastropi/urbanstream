@@ -1,14 +1,13 @@
 """Collector 부품 단위 테스트: 설정, 요청 명세, 재시도·회로차단·예산, 원본 저장, 마스킹, 발행기, 스케줄러, 토픽 스크립트."""
 import gzip
 import importlib.util
-import json
 import random
 import sys
 from datetime import datetime, timedelta
 
 import pytest
 import yaml
-from collector_helpers import KEYS, ROOT, T0, Clock
+from collector_helpers import ROOT, T0, Clock
 
 from collector.config import (BreakerConfig, ConfigError, RetryConfig, expand_env, load_config, load_topics,
                               parse_hhmm)

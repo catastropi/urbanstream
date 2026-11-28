@@ -44,15 +44,20 @@ def test_classify_docs_only_runs_nothing_heavy():
 
 def test_classify_api_change_selects_api_and_docker_not_dags():
     res = CH.classify(["api/main.py"])
-    assert res == {"api": True, "dags": False, "docker": True, "infra": False}
+    assert res == {"api": True, "dags": False, "docker": True, "infra": False, "data": False}
 
 
 def test_classify_dag_change_selects_only_dags():
-    assert CH.classify(["dags/x.py"]) == {"api": False, "dags": True, "docker": False, "infra": False}
+    assert CH.classify(["dags/x.py"]) == {"api": False, "dags": True, "docker": False, "infra": False, "data": False}
 
 
 def test_classify_infra_change_selects_only_infra():
-    assert CH.classify(["infra/terraform/main.tf"]) == {"api": False, "dags": False, "docker": False, "infra": True}
+    assert CH.classify(["infra/terraform/main.tf"]) == {"api": False, "dags": False, "docker": False, "infra": True, "data": False}
+
+
+def test_classify_reprocess_change_selects_data_and_dags():
+    assert CH.classify(["batch/reprocess.py"]) == {"api": False, "dags": True, "docker": False, "infra": False, "data": True}
+    assert CH.classify(["tests/unit/test_silver_pointer.py"])["data"] is True
 
 
 def test_classify_each_group_triggers_on_its_own_prefix():

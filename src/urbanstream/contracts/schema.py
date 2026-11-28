@@ -9,7 +9,7 @@ from __future__ import annotations
 import dataclasses
 import typing
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 _TYPE_NAMES = {str: "string", int: "long", float: "double", bool: "boolean", datetime: "timestamp"}
 

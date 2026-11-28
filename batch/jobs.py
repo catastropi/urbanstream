@@ -21,7 +21,7 @@ import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from contextlib import contextmanager
-from typing import Any, Callable, Iterable, Iterator, Mapping, Optional, Sequence
+from typing import Any, Callable, Iterable, Iterator, Mapping, Optional
 from zoneinfo import ZoneInfo
 
 LOG = logging.getLogger("urbanstream.batch.jobs")

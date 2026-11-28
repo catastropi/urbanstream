@@ -19,7 +19,9 @@
   - `0015-reprocess.md` — STEP 1 Bronze→Silver 재처리(별도 루트 + 날짜별 포인터)와 Gold 범위 교체(재처리 경로에서만, 한 트랜잭션)
   - `0016-step2-measure.md` — STEP 2 성능·규모 측정: M1~M8, 합성 데이터 분리(표시 네 곳·별도 DB·날짜), 실행 위치, 안전장치(실행 전 검사·금지 시간대·감시), 11-25 적용 중 고친 것
   - `0017-step3b-recovery.md` — STEP 3B 복구 자동화와 장애 훈련: 시나리오 R1~R14, 결정 1~12, 설계안과 달라진 4곳, 작업 잠금, host_watch, 시험
+  - `0018-step5-tests-ci.md` — STEP 5 테스트 숫자 자동화, 데이터 로직 뮤테이션 27건, ruff 규칙 확대, 작업 환경 흔적 래칫
 - `recovery-drills.md` — 장애 훈련과 실제 장애 기록 표 (`drill.py` 가 한 줄씩 붙인다)
+- `testing.md` — 테스트 계층, 계층마다 실제로 확인하는 것, 뮤테이션 테스트, 실행 기록 (숫자 칸은 `scripts/test_inventory.py` 가 쓴다)
 - `evidence/step12/` — Step 12 증거 이미지 19장(마스킹함)과 설명 `README.md` (Azure 배포·접속·비용·파괴).
 - `runbooks/` — 절차서.
   - `step0-closeout.md` — Step 0 마무리 측정·확인 (사용자가 Mac 에서 실행)

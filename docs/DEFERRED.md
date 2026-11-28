@@ -406,3 +406,19 @@ Mac 적용은 12-08 이전에 한 번(수집 공백 없음: 수집기·compose �
 | D-303 | 수집기 한 주기의 전달 실패 수가 다음 주기로 넘어갈 수 있음 | ⏸ 알려진 한계 | `collector/runner.py` 는 주기 끝에 `flush(10초)` 하고 앞뒤 `errors` 차이를 그 주기의 실패로 센다. 생산자의 전달 한도는 30초라, 브로커가 10~30초 멈추면 아직 결과가 안 난 메시지가 다음 주기의 실패(또는 성공)로 세어진다. 전체 합계는 맞고, 원본은 raw 에 있다 | kafka-stop 훈련 때 감사 기록의 `delivery_errors` 합계와 잃은 건수를 비교한다 |
 
 기존 항목 갱신(11-26): D-126 → host_watch(D-297)로 'Docker·monitor 가 멈춘 경우' 는 메움, Mac 이 꺼진 경우는 그대로. D-212 → 같은 작업의 DB 쓰기 겹침은 작업 잠금(D-294)으로 막음. D-214 → 재시작 정책은 `on-failure` 유지, 켜는 순서는 `recover.py resume`(결정 7).
+
+## V. STEP 5 테스트·CI (11-28)
+
+설계안 결정 1~6 을 권고안대로 진행했다(ADR-0018). 설명과 실행 기록은 `docs/testing.md`.
+Mac 적용은 파일만 바꾼다. 컨테이너 재시작·재빌드가 없고 수집·측정 잠금·표본 수집에 영향이 없다.
+
+| ID | 항목 | 상태 | 내용 | 다음 / 확인 |
+|---|---|---|---|---|
+| D-304 | STEP 5 일체 | ✅ 코드 2026-11-28 / ⏳ Mac 적용·push | `scripts/test_inventory.py`, `scripts/mutation_data.py`, `scripts/doc_traces.py`, ruff 규칙, CI `mutation-data` job, hygiene 두 단계, weekly 의 Spark 뮤테이션과 `mutation_ci.py` | push 뒤 ci·weekly 가 초록인지 Actions 화면에서 확인하고 `docs/testing.md` 기록 표에 링크 |
+| D-305 | **테스트 숫자 (감사 H-3)** | ✅ 2026-11-28 | README 의 "702개, 551 passed / 89 skipped" 를 지웠다. 문서와 대조하는 숫자는 `def test_` 개수뿐이고 CI hygiene 이 `readme --check` 로 확인한다. passed/skipped 는 환경마다 달라 대조하지 않고 기록 표에 날짜·환경과 함께 적는다. CI 의 test-core·test-pg·spark job 은 계층별 결과 표를 실행 요약에 남긴다 | — |
+| D-306 | **데이터 로직 뮤테이션 27건** | ✅ 2026-11-28 | 재처리·적재·DQ·증분·중복 제거·잠금. 첫 실행 25/27. 놓친 2건: 평소 적재 불변성(뮤테이션이 엉뚱한 테스트를 가리킴, 대상 수정), `volume_drift` 기준선에 당일 포함(테스트 추가). Spark 3건은 weekly 에서만 | 데이터 코드를 바꿀 때 새 분기에는 뮤테이션도 하나 더한다 |
+| D-307 | ruff F401·F841·F541 | ✅ 2026-11-28 | 저장소 44건을 고쳤다(운영 코드 `batch/`·`src/`·`collector/` 의 import 줄 포함, 동작 변화 없음). ADR-0013 의 "F401/F811 오탐 129건" 은 지금 세면 F401 41건(진짜 미사용)·F811 119건(fixture 패턴)이다. F811 은 계속 끈다 | 수집기 이미지는 다음 재빌드 때 같아진다(지금 이미지의 코드와 import 한 줄 차이) |
+| D-308 | 작업 환경 흔적 래칫 | ✅ 2026-11-28 / ⏸ 0건은 STEP 6 | `scripts/doc_traces.py check` 가 감사 6-1 의 표현 8종을 파일별로 세고 기준(3B-1 적용 상태: 59개 파일 180건)보다 늘면 실패한다. 이번에 새로 쓴 문서는 0건이다 | STEP 6 에서 파일을 고칠 때마다 `update` 로 기준을 낮춘다 |
+| D-309 | `mutation_ci.py` 가 CI 에서 돌지 않았음 | ✅ 2026-11-28 | README 의 "65건 전부 검출" 은 손으로 돌린 결과였다. weekly `mutation-api-full` 에 넣었다. 이번 ci.yml 변경으로 정의 2건이 어긋나 같이 고쳤다 | 첫 weekly 실행 |
+| D-310 | 끝나지 않은 테스트 한 줄 | ✅ 2026-11-28 | `test_monitor_pg.py` 의 `env2 = None`(F841) 은 쓰다 만 줄이었다. 같은 동작(소스가 죽으면 레이어 알림 없음)은 `test_monitor_pure.py` 가 이미 확인해서 줄만 지웠다 | — |
+| D-311 | CI 실행 결과를 직접 읽지 못함 (감사 M-9) | ⏸ 사용자 | 이 작업 환경은 Actions API 에 접근하지 못했다. 공개 저장소의 Actions 화면은 누구나 볼 수 있다 | push 뒤 실행 링크를 기록 표에 적는다 |

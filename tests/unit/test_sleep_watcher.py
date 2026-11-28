@@ -1,5 +1,3 @@
-import json
-from datetime import datetime, timezone
 
 from collector.runner import SleepWatcher, report_resume
 

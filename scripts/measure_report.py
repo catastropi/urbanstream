@@ -22,7 +22,7 @@ import re
 import statistics
 import sys
 from collections import defaultdict
-from datetime import date, datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
@@ -414,7 +414,7 @@ def build(cfg: dict, root: Path = ROOT, *, storage: bool = False, since: Optiona
         doc = replace_section(doc, "decide", "\n".join([
             f"- M-2 배치 COPY: 10× 로더 최대 메모리 {dec['loader_peak_10x_mib']} MiB (기준 {cfg['decide']['m2_loader_peak_mib']}), "
             f"5×→10× 적재 시간비 {dec['time_ratio_5_to_10']} (기준 {cfg['decide']['m2_time_ratio_5_to_10']}) → {dec['verdict']}",
-            f"- H-5 compaction: " + ("측정 부족" if not m7 else ("조건 넘음: compaction 설계안을 따로 올린다" if h5
+            "- H-5 compaction: " + ("측정 부족" if not m7 else ("조건 넘음: compaction 설계안을 따로 올린다" if h5
                                                                else f"조건 안 넘음(읽기 시간 {int(cfg['decide']['h5_min_read_cut'] * 100)}% 이상 줄지 않음)"))]))
         p.write_text(doc, encoding="utf-8")
     return {"active": active, "m7": m7, "decide": dec, "m1": m1, "m2": m2, "m4": m4, "m3": m3, "coverage": cov}

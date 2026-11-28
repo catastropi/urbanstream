@@ -1,7 +1,6 @@
 """Notifier 규칙 시험 (저장소·전송·시계 주입, DB·네트워크 없음)."""
 from datetime import datetime, timedelta, timezone
 
-import pytest
 
 from urbanstream.notify import Decision, Notifier, mask
 from urbanstream.notify.policy import from_mapping

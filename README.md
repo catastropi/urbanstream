@@ -62,7 +62,7 @@ Azure에 올렸던 서빙 계층에서 캡처한 화면입니다(11-12 시점 �
 | 수집 호출 | 소스 5종 합계 15,252건. 성공률은 4개 소스가 94~96%이고, 기상청은 발표 직후 `NO_DATA` 응답을 실패로 센 기간이 있어 73%로 낮게 나옴 |
 | Gold 적재 시간 | gold_intraday 평균 3초(최대 19초), gold_daily 평균 4초(최대 9초). 데이터가 작아서 나온 값이라 확장성의 근거는 아님 |
 | API 응답(로컬, 20회) | 중앙값 약 29 ms, 첫 호출 1.85초. 응답 캐시가 있고 `/v1/traffic/current` 하나만 측정 |
-| 시험 | 시험 함수 702개(64개 파일, 파라미터 확장 전), 변이 시험 65건 전부 검출(11-17 점검). 로컬 Mac 실행은 551 passed / 89 skipped이며, 의존성이나 DB가 없으면 건너뛰는 시험이 있어(예: pyproj) 전체는 CI에서 돌림 |
+| 테스트 | <!-- tests:readme:start -->테스트 함수 976개(파일 92개, 파라미터 확장 전): unit 525, contract 50, integration 93, spark 123, e2e 4, recovery 47, api 59, dashboard 75. 뮤테이션 테스트는 데이터 로직 27건, API 30건, 대시보드 33건, CI 설정 65건. 실행 결과와 환경은 [docs/testing.md](docs/testing.md)<!-- tests:readme:end --> |
 | 수집 실측(11-03) | 호출 실패·재시도 0, 발행 수 = 레코드 수, 약 175건/분 |
 
 ## 운영하면서 겪은 문제
@@ -78,6 +78,8 @@ Azure에 올렸던 서빙 계층에서 캡처한 화면입니다(11-12 시점 �
 - **STEP 2 측정 도구를 Mac 에 적용하며 생긴 문제(D-289~D-291, 11-25).** 수집기 컨테이너가 좀비 프로세스 때문에 `docker stop` 으로 꺼지지 않아, 우리 코드가 PID 1 로 도는 서비스에 init 을 넣었습니다. launchd 로 등록한 5분 표본 수집기가 주기 실행되지 않아(원인 미확정) 수집기가 스스로 반복하게 바꿨습니다. 프로필 하나만 켠 `docker compose` 명령이 의존 서비스가 정의에 없다며 실패해, 문서와 도구의 명령을 고치고 문서에 적힌 모든 프로필 조합을 시험으로 검사합니다.
 
 - **Docker Desktop 이 멈추자 알림이 0건(11-24~25, D-126·D-297).** 알림을 보내는 monitor 도 Docker 안에 있어서 같이 멈췄습니다. Docker 밖(Mac 의 Python)에서 1분마다 Docker 응답·컨테이너 상태·monitor 박동·Docker 시계를 보고 웹훅으로 직접 보내는 `host_watch` 를 더했습니다. Mac 이 잠들거나 꺼진 경우는 여전히 알릴 수 없습니다. 증상마다 칠 명령을 하나로 모은 `scripts/recover.py diagnose`, 같은 Gold 작업이 겹쳐 돌지 않게 하는 DB 세션 잠금, 실제 Kafka 브로커를 죽였다 살리는 시험을 함께 넣었고, 일부러 고장 내는 훈련과 실제 장애를 `docs/recovery-drills.md` 한 표에 적습니다(STEP 3B, ADR-0017).
+
+- **테스트 숫자를 믿을 수 없었고, 데이터 로직을 망가뜨려도 잡히는지 몰랐음(D-304~D-307, 11-28).** README 의 숫자는 언제 어디서 돌린 것인지 적혀 있지 않았고 실제 코드와도 달랐습니다. 이제 테스트 함수 수는 `scripts/test_inventory.py` 가 코드에서 세어 이 README 와 `docs/testing.md` 에 쓰고, CI 가 코드와 같은지 확인합니다. 실행 결과는 날짜·환경과 함께 기록 표에 남깁니다. 재처리·중복 제거·적재·DQ·증분·잠금 코드를 한 곳씩 망가뜨리는 뮤테이션 27건을 만들었더니 2건을 테스트가 잡지 못해 보강했습니다.
 
 ## Azure 배포
 
@@ -139,9 +141,10 @@ tests/            unit·integration·contract·e2e·recovery·spark    docs/  AD
 
 | 문서 | 용도 |
 |---|---|
-| `docs/adr/` | 설계 결정 14건(날짜·이유·되돌리는 방법) |
+| `docs/adr/` | 설계 결정 기록(날짜·이유·되돌리는 방법) |
 | `docs/runbooks/` | 단계별 실행·복구 절차 |
 | `docs/DEFERRED.md` | 미룬 일·미확인 항목 장부 |
+| `docs/testing.md` | 테스트 계층과 실제로 확인하는 것, 뮤테이션 테스트, 실행 기록 |
 | `docs/api-catalog/` | API 5종의 필드·코드를 직접 호출해 확인한 기록 |
 | `docs/erd/gold.md` | Gold 스키마 |
 | `docs/evidence/step12/` | Azure 배포 증거 |

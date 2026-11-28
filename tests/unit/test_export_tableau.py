@@ -3,11 +3,10 @@ from __future__ import annotations
 
 import csv
 import importlib.util
-import io
 import json
 import re
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from pathlib import Path
 
 import pytest

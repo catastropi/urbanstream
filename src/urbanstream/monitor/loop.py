@@ -12,7 +12,6 @@ tick 순서 (ADR-0010 D8-2~D8-5)
 from __future__ import annotations
 
 import logging
-import os
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone

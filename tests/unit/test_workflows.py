@@ -86,7 +86,7 @@ def test_no_untrusted_expression_inside_run_scripts(f):
 def test_ci_has_expected_jobs_and_aggregator_needs_all():
     doc = load("ci.yml")
     jobs = doc["jobs"]
-    assert set(jobs) == {"changes", "hygiene", "secrets", "test-core", "test-minimal", "test-pg", "mutation-api", "dags", "docker-build", "terraform", "ci-ok"}
+    assert set(jobs) == {"changes", "hygiene", "secrets", "test-core", "test-minimal", "test-pg", "mutation-api", "mutation-data", "dags", "docker-build", "terraform", "ci-ok"}
     agg = jobs["ci-ok"]
     assert agg["if"].strip() == "always()"
     assert set(agg["needs"]) == set(jobs) - {"ci-ok"}

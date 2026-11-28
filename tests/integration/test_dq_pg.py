@@ -1,7 +1,6 @@
 """Step 8b: DQ 검사·기록·알림·게이트를 실제 Postgres 에서 확인한다 (합성 데이터에 빈 경우 포함, 역할은 SET ROLE)."""
 from __future__ import annotations
 
-import json
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
@@ -130,6 +129,16 @@ def test_volume_drift_short_baseline_unknown_then_pass_and_fail(pg):
     pg.execute("INSERT INTO ops.data_gap (kind, gap_start, gap_end, duration_sec) VALUES ('host_stall', %s, %s, 64800)",
                (datetime(2026, 11, 4, 6, 0, tzinfo=KST), datetime(2026, 11, 5, 0, 0, tzinfo=KST)))
     assert run(pg, vd)[0].result.status == "warn"
+
+
+def test_volume_drift_baseline_does_not_count_the_checked_day(pg):
+    """기준선은 검사하는 날 이전만 쓴다. 당일이 기준선에 들어가면 기준 일수가 하루 늘어 '판정 불가'가 판정으로 바뀌고, 비율도 1 쪽으로 끌려간다."""
+    vd = {"id": "vd", "kind": "volume_drift", "table": "fact.traffic_speed", "date_col": "event_date", "baseline_days": 7, "min_baseline_days": 3, "low": 0.5, "high": 2.0}
+    traffic(pg, d=D)
+    for k in (1, 2):
+        traffic(pg, d=D - timedelta(days=k))
+    r = run(pg, vd)[0].result
+    assert r.status == "unknown" and r.detail["baseline_days"] == 2
 
 
 def test_ref_integrity_and_empty_parent(pg):

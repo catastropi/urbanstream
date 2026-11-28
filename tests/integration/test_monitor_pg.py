@@ -197,8 +197,6 @@ def test_layer_stale_alerts_only_when_source_ok(env):
     env.tick(60)
     assert len(env.posts) == n                                  # 쿨다운: 같은 정체를 다시 울리지 않는다
     env.posts.clear()
-    # 소스가 죽으면 레이어는 unknown/source_not_ok 로만 기록하고 알림을 내지 않는다
-    env2 = None
 
 
 def test_no_layer_stall_alert_right_after_a_collection_window_opens(env):

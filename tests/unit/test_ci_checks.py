@@ -115,11 +115,11 @@ def test_main_rejects_unknown_subcommand():
         CC.main(["bogus"])
 
 
-def test_ruff_config_selects_the_fatal_rules():
+def test_ruff_config_selects_the_agreed_rules():
     text = (ROOT / "ruff.toml").read_text(encoding="utf-8")
     sel = re.search(r"^select\s*=\s*\[(.*?)\]", text, re.M | re.S).group(1)
     rules = set(re.findall(r'"(\w+)"', sel))
-    assert rules == {"E9", "F63", "F7", "F82"}
+    assert rules == {"E9", "F63", "F7", "F82", "F401", "F841", "F541"}      # 바꿀 때는 ADR-0018 과 함께
 
 
 def test_ruff_gate_rejects_an_undefined_name_with_the_repo_config(tmp_path):
@@ -130,3 +130,13 @@ def test_ruff_gate_rejects_an_undefined_name_with_the_repo_config(tmp_path):
     bad.write_text("def f():\n    return undefined_name\n")
     r = subprocess.run([ruff, "check", "--config", str(ROOT / "ruff.toml"), str(bad)], capture_output=True, text=True)
     assert r.returncode != 0 and "F821" in r.stdout
+
+
+def test_ruff_gate_rejects_an_unused_import_with_the_repo_config(tmp_path):
+    ruff = shutil.which("ruff")
+    if ruff is None:
+        pytest.skip("ruff 미설치: CI 의 hygiene job 에서 실행")
+    bad = tmp_path / "bad.py"
+    bad.write_text("import os\n\n\ndef f():\n    return 1\n")
+    r = subprocess.run([ruff, "check", "--config", str(ROOT / "ruff.toml"), str(bad)], capture_output=True, text=True)
+    assert r.returncode != 0 and "F401" in r.stdout

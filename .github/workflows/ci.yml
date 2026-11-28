@@ -31,6 +31,7 @@ jobs:
       dags: ${{ steps.c.outputs.dags }}
       docker: ${{ steps.c.outputs.docker }}
       infra: ${{ steps.c.outputs.infra }}
+      data: ${{ steps.c.outputs.data }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -53,8 +54,12 @@ jobs:
           cache-dependency-path: requirements*.txt
       - name: 도구 설치 (ruff 는 버전 고정)
         run: pip install ruff==0.16.9 -r requirements-api.txt
-      - name: ruff — 치명 오류만 (ruff.toml)
+      - name: ruff (ruff.toml 의 규칙)
         run: ruff check .
+      - name: 문서의 테스트 숫자가 코드와 같은지 (STEP 5)
+        run: python scripts/test_inventory.py readme --check
+      - name: 작업 환경 흔적이 기준보다 늘지 않았는지 (STEP 5)
+        run: python scripts/doc_traces.py check
       - name: 추적 금지 파일 (.env · data/ 실파일 · 내보내기 CSV · 캐시)
         run: python scripts/ci_checks.py tracked
       - name: docker compose config (더미 환경 파일, 전체 프로파일)
@@ -86,15 +91,18 @@ jobs:
           cache-dependency-path: requirements*.txt
       - run: pip install -r requirements-dev.txt -r requirements-dashboard.txt
       - name: unit
-        run: python -m pytest -q -m unit
+        run: python -m pytest -q -m unit --junitxml=junit/unit.xml
       - name: contract
-        run: python -m pytest -q -m contract
+        run: python -m pytest -q -m contract --junitxml=junit/contract.xml
       - name: recovery
-        run: python -m pytest -q -m recovery
+        run: python -m pytest -q -m recovery --junitxml=junit/recovery.xml
       - name: api (DB 없는 부분)
-        run: python -m pytest -q -m api
+        run: python -m pytest -q -m api --junitxml=junit/api.xml
       - name: dashboard (AppTest 포함)
-        run: python -m pytest -q -m dashboard
+        run: python -m pytest -q -m dashboard --junitxml=junit/dashboard.xml
+      - name: 계층별 결과 요약 (실행 요약 화면에 표로)
+        if: always()
+        run: python scripts/test_inventory.py summarize junit/*.xml --title "test-core (Python 3.12, DB 없음)"
       - name: 대시보드 변이 시험 (코드를 일부러 깨서 시험이 잡는지)
         run: python scripts/mutation_dashboard.py
 
@@ -141,7 +149,10 @@ jobs:
           cache-dependency-path: requirements*.txt
       - run: pip install -r requirements-dev.txt -r requirements-dashboard.txt
       - name: 전체 시험 (Spark 제외) — integration · data · api · dashboard · e2e
-        run: python -m pytest -q -m "not spark" --durations=10
+        run: python -m pytest -q -m "not spark" --durations=10 --junitxml=junit/pg.xml
+      - name: 계층별 결과 요약 (실행 요약 화면에 표로)
+        if: always()
+        run: python scripts/test_inventory.py summarize junit/pg.xml --title "test-pg (Python 3.12, PostGIS 17)"
 
   mutation-api:
     needs: changes
@@ -173,6 +184,38 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - name: API 변이 시험 30건
         run: python scripts/mutation_api.py
+
+  mutation-data:
+    # STEP 5: 재처리·중복 제거·적재·DQ·증분·잠금 코드를 일부러 망가뜨려 테스트가 잡는지. Spark 항목은 weekly 에서.
+    needs: changes
+    if: needs.changes.outputs.data == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: imresamu/postgis:17-3.6.1-bookworm
+        env:
+          POSTGRES_PASSWORD: ci-not-a-secret
+          POSTGRES_DB: ut_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ut_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      GOLD_TEST_DSN: host=127.0.0.1 port=5432 dbname=ut_test user=postgres password=ci-not-a-secret
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - name: 데이터 로직 뮤테이션 (pyspark 가 없으니 Spark 항목은 건너뛴다)
+        run: python scripts/mutation_data.py
 
   dags:
     needs: changes
@@ -237,7 +280,7 @@ jobs:
   ci-ok:
     # 브랜치 보호를 켠다면 이 job 하나만 '필수 검사'로 지정하면 된다. 건너뛴 job(skipped)은 통과로 본다.
     if: always()
-    needs: [changes, hygiene, secrets, test-core, test-minimal, test-pg, mutation-api, dags, docker-build, terraform]
+    needs: [changes, hygiene, secrets, test-core, test-minimal, test-pg, mutation-api, mutation-data, dags, docker-build, terraform]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

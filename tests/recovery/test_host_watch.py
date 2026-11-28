@@ -152,7 +152,6 @@ def test_loop_runs_itself_with_a_pid_file_and_cleans_up(tmp_path, monkeypatch, c
     assert not (d / W.PID).exists() and W.read_state(d)["last_tick"]
     H.take_pid(d / W.PID)
     with pytest.raises(RuntimeError, match="이미 돌고"):
-        import os
         (d / W.PID).write_text("1\n")                       # PID 1 은 늘 살아 있다
         W.loop(cfg, d, max_iter=1)
 

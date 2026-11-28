@@ -34,7 +34,7 @@ import subprocess
 import sys
 import time
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -44,7 +44,7 @@ for p in (ROOT, ROOT / "src", HERE):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-from measure_guard import (GIB, KST, GuardError, Lock, Watchdog, _resolve, ensure_measure_db, ensure_measure_path,  # noqa: E402
+from measure_guard import (KST, GuardError, Lock, Watchdog, _resolve, ensure_measure_db, ensure_measure_path,  # noqa: E402
                            gate_checks, load_config, print_checks)
 
 NON_SPARK_TABLES = ["silver_traffic_speed", "silver_bus_position", "silver_bus_arrival", "silver_weather"]   # M7: 돌발은 파티션 규칙이 달라 뺀다

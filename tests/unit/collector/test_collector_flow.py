@@ -2,9 +2,8 @@
 import gzip
 import json
 import random
-from datetime import timedelta
 
-from collector_helpers import (KEYS, T0, Clock, FakeFetcher, body, fixture_bytes, make_collector, net_error, ok,
+from collector_helpers import (KEYS, T0, Clock, body, fixture_bytes, make_collector, net_error, ok,
                                router_for_fixtures, target)
 
 from collector.config import load_config

@@ -3,7 +3,6 @@ GOLD_TEST_DSN 이 없으면 건너뛴다. 같은 컨테이너에서 Spark 와 DB
 from __future__ import annotations
 
 import json
-import os
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 

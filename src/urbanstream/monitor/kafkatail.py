@@ -4,8 +4,8 @@ confluent_kafka 는 쓸 때만 import 한다."""
 from __future__ import annotations
 
 import time
-from datetime import datetime, timedelta, timezone
-from typing import Any, Mapping, Optional
+from datetime import datetime, timedelta
+from typing import Mapping
 
 
 class KafkaUnavailable(RuntimeError):

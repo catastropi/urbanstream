@@ -16,7 +16,7 @@ pytest.importorskip("pyspark")
 
 from pyspark.sql import functions as F  # noqa: E402
 
-from streaming.bronze import BronzeConfig, BronzeTable, read_kafka, to_bronze, write_bronze  # noqa: E402
+from streaming.bronze import BronzeConfig, BronzeTable, to_bronze, write_bronze  # noqa: E402
 
 from spark_helpers import message_json, parse_sample  # noqa: E402
 

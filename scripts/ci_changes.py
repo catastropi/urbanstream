@@ -25,6 +25,9 @@ GROUPS: dict[str, tuple[str, ...]] = {
     "docker": ("docker/api/", "docker/dashboard/", "docker/collector/", "api/", "dashboard/", "collector/",
                "requirements-api.txt", "requirements-dashboard.txt", "requirements-collector.txt", ".dockerignore"),
     "infra": ("infra/", ".github/terraform.pin"),
+    # STEP 5: 데이터 로직 뮤테이션(scripts/mutation_data.py)이 망가뜨리는 코드와 그것을 잡는 테스트
+    "data": ("batch/", "streaming/", "src/urbanstream/dq/", "sql/", "config/dq_rules.yaml", "scripts/mutation_data.py",
+             "tests/integration/", "tests/unit/test_silver_pointer.py", "tests/unit/test_incremental.py", "tests/unit/test_job_lock.py"),
 }
 
 

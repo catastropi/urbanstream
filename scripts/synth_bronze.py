@@ -26,7 +26,6 @@
 from __future__ import annotations
 
 import argparse
-import bisect
 import dataclasses
 import hashlib
 import json
@@ -299,7 +298,6 @@ def gen_calls(source: str, prof: dict, scale: int, d: date, rng: random.Random, 
     times = call_times(prof["calls_by_hour"], scale if per_call_source else 1, d, rng)
     lat_q = prof.get("latency_ms_q") or [100.0]
     lag_q = prof.get("lag_sec_q") or [0.0]
-    spec = SOURCES[source]
     generic = {k: v for k, v in fields.items()}
     short = {"seoul_traffic": "trf", "seoul_incident": "inc", "bus_position": "pos", "bus_arrival": "arr", "kma_ncst": "wea"}[source]
 
